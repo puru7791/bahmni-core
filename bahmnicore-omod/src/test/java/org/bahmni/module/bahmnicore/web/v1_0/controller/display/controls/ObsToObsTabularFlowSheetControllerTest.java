@@ -8,6 +8,7 @@ import org.bahmni.module.bahmnicore.web.v1_0.mapper.BahmniFormBuilderObsToTabula
 import org.bahmni.module.bahmnicore.web.v1_0.mapper.BahmniObservationsToTabularViewMapper;
 import org.bahmni.test.builder.ConceptBuilder;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -21,6 +22,7 @@ import org.openmrs.Concept;
 import org.openmrs.ConceptNumeric;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.context.Context;
+import org.openmrs.api.context.TestUsernameAuthenticationScheme;
 import org.openmrs.api.context.UserContext;
 import org.openmrs.module.bahmniemrapi.drugogram.contract.BaseTableExtension;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniObservation;
@@ -95,7 +97,7 @@ public class ObsToObsTabularFlowSheetControllerTest {
         initMocks(this);
         mockStatic(LocaleUtility.class);
         when(LocaleUtility.getDefaultLocale()).thenReturn(Locale.ENGLISH);
-        Context.setUserContext(new UserContext());
+        Context.setUserContext(new UserContext(new TestUsernameAuthenticationScheme()));
         obsToObsPivotTableController = new ObsToObsTabularFlowSheetController(bahmniObsService, conceptService,
                 bahmniObservationsToTabularViewMapper, bahmniExtensions, bahmniConceptService,
                 bahmniFormBuilderObsToTabularViewMapper);
@@ -146,17 +148,18 @@ public class ObsToObsTabularFlowSheetControllerTest {
     @Test
     public void shouldReturnEmptyPivotTableWhenFormNamesAreNotGiven() throws ParseException {
 
-        PivotTable pivotTable = obsToObsPivotTableController.constructPivotTableFor(any(), any(), any(), any(), any(),
-                singletonList(""), any(), any(), any(), any(), any(), any(), null);
-
+        ObsToObsTabularFlowSheetController obsToObsTabularFlowSheetController = spy(obsToObsPivotTableController);
+        PivotTable pivotTable = obsToObsTabularFlowSheetController.constructPivotTableFor(any(), any(), any(), any(), any(),
+                eq(singletonList("")), any(), any(), any(), any(), any(), any(), eq(null));
         assertEquals(0, pivotTable.getHeaders().size());
     }
 
     @Test
     public void shouldReturnEmptyPivotTableWhenConceptNamesAreNotGiven() throws ParseException {
 
-        PivotTable pivotTable = obsToObsPivotTableController.constructPivotTableFor(any(), any(), any(), any(), any(),
-                null, any(), any(), any(), any(), any(), any(), singletonList(""));
+        ObsToObsTabularFlowSheetController obsToObsTabularFlowSheetController = spy(obsToObsPivotTableController);
+        PivotTable pivotTable = obsToObsTabularFlowSheetController.constructPivotTableFor(any(), any(), any(), any(), any(),
+                eq(null), any(), any(), any(), any(), any(), any(), eq(singletonList("")));
 
         assertEquals(0, pivotTable.getHeaders().size());
     }
@@ -164,8 +167,9 @@ public class ObsToObsTabularFlowSheetControllerTest {
     @Test
     public void shouldReturnEmptyPivotTableWhenFormNamesAreEmpty() throws ParseException {
 
-        PivotTable pivotTable = obsToObsPivotTableController.constructPivotTableFor(any(), any(), any(), any(), any(),
-                null, any(), any(), any(), any(), any(), any(), emptyList());
+        ObsToObsTabularFlowSheetController obsToObsTabularFlowSheetController = spy(obsToObsPivotTableController);
+        PivotTable pivotTable = obsToObsTabularFlowSheetController.constructPivotTableFor(any(), any(), any(), any(), any(),
+                eq(null), any(), any(), any(), any(), any(), any(), eq(emptyList()));
 
         assertEquals(0, pivotTable.getHeaders().size());
     }
@@ -449,7 +453,7 @@ public class ObsToObsTabularFlowSheetControllerTest {
         labMagnesiumNumeric.setHiNormal(5.0);
         labMagnesiumNumeric.setLowNormal(2.0);
         labMagnesiumNumeric.setUnits("mg");
-        when(conceptService.getConceptNumeric(anyInt())).thenReturn(labMagnesiumNumeric);
+        when(conceptService.getConceptNumeric(eq(null))).thenReturn(labMagnesiumNumeric);
 
         when(conceptService.getConceptByName("Lab, Magnesium Data")).thenReturn(labMagnesiumData);
         when(conceptService.getConceptByName("Lab, Magnesium")).thenReturn(labMagnesium);

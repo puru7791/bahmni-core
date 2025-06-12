@@ -4,7 +4,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.xerces.impl.dv.util.Base64;
 import org.bahmni.module.bahmnicore.BaseIntegrationTest;
 import org.bahmni.module.bahmnicore.properties.BahmniCoreProperties;
-import org.junit.Before;
 import org.junit.Test;
 import org.openmrs.Patient;
 import org.openmrs.util.OpenmrsUtil;
@@ -16,8 +15,6 @@ import java.nio.file.Paths;
 
 import static junit.framework.TestCase.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.times;
-import static org.powermock.api.mockito.PowerMockito.verifyStatic;
 
 public class PatientDocumentServiceImplIT extends BaseIntegrationTest{
 
@@ -41,7 +38,7 @@ public class PatientDocumentServiceImplIT extends BaseIntegrationTest{
 
 		byte[] allBytes = Files.readAllBytes(Paths.get("src/test/resources/SampleVideo.mkv"));
 		String content = Base64.encode(allBytes);
-		String url = patientDocumentService.saveDocument(1, "Consultation", content, "mkv", "video");
+		String url = patientDocumentService.saveDocument(1, "Consultation", content, "mkv", "video", "file-name");
 		assertTrue(url.matches(".*1-Consultation-.*.mkv"));
 		String videoUrl = BahmniCoreProperties.getProperty("bahmnicore.documents.baseDirectory")  + "/" + url;
 		String thumbnailUrl  = BahmniCoreProperties.getProperty("bahmnicore.documents.baseDirectory")  + "/" + url.split("\\.")[0] + "_thumbnail.jpg";
@@ -64,7 +61,7 @@ public class PatientDocumentServiceImplIT extends BaseIntegrationTest{
 
 		byte[] allBytes = Files.readAllBytes(Paths.get("src/test/resources/SampleVideo.mov"));
 		String content = Base64.encode(allBytes);
-		String url = patientDocumentService.saveDocument(1, "Consultation", content, "mov", "video");
+		String url = patientDocumentService.saveDocument(1, "Consultation", content, "mov", "video", "file-name");
 		assertTrue(url.matches(".*1-Consultation-.*.mov"));
 		String videoUrl = BahmniCoreProperties.getProperty("bahmnicore.documents.baseDirectory")  + "/" + url;
 		String thumbnailUrl  = BahmniCoreProperties.getProperty("bahmnicore.documents.baseDirectory")  + "/" + url.split("\\.")[0] + "_thumbnail.jpg";

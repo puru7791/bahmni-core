@@ -2,12 +2,13 @@ package org.bahmni.module.admin.csv.service;
 
 import groovy.lang.GroovyClassLoader;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bahmni.csv.KeyValue;
 import org.bahmni.module.admin.csv.patientmatchingalgorithm.BahmniPatientMatchingAlgorithm;
 import org.bahmni.module.admin.csv.patientmatchingalgorithm.PatientMatchingAlgorithm;
 import org.bahmni.module.admin.csv.patientmatchingalgorithm.exception.CannotMatchPatientException;
-import org.bahmni.module.bahmnicore.service.BahmniPatientService;
+import org.bahmni.module.bahmnicommons.api.service.BahmniPatientService;
 import org.openmrs.Patient;
 import org.openmrs.util.OpenmrsUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +26,7 @@ public class PatientMatchService {
     private BahmniPatientService patientService;
 
     private static final String PATIENT_MATCHING_ALGORITHM_DIRECTORY = "/patientMatchingAlgorithm/";
-    private static final Logger log = Logger.getLogger(PatientMatchService.class);
+    private static final Logger log = LogManager.getLogger(PatientMatchService.class);
 
     // Mujir - an implementation could use multiple patient matching algorithms
     protected Map<String, PatientMatchingAlgorithm> patientMatchingAlgorithms = new HashMap<>();

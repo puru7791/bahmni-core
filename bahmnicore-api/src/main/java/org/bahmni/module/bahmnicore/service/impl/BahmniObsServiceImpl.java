@@ -18,8 +18,10 @@ import org.openmrs.Visit;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.ObsService;
 import org.openmrs.api.VisitService;
+import org.openmrs.api.context.Context;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniObservation;
 import org.openmrs.module.bahmniemrapi.encountertransaction.mapper.OMRSObsToBahmniObsMapper;
+import org.openmrs.util.LocaleUtility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -59,7 +61,7 @@ public class BahmniObsServiceImpl implements BahmniObsService {
             List<String> conceptNames = getConceptNames(concepts);
 
             List<Obs> observations = obsDao.getObsByPatientAndVisit(patientUuid, conceptNames,
-                    visitDao.getVisitIdsFor(patientUuid, numberOfVisits), -1, ObsDaoImpl.OrderBy.DESC, obsIgnoreList, filterOutOrderObs, order, startDate, endDate);
+                    visitDao.getVisitIdsFor(patientUuid, numberOfVisits), Integer.MAX_VALUE, ObsDaoImpl.OrderBy.DESC, obsIgnoreList, filterOutOrderObs, order, startDate, endDate);
 
             return omrsObsToBahmniObsMapper.map(filterIgnoredObs(obsIgnoreList,observations), concepts);
         }
@@ -69,9 +71,18 @@ public class BahmniObsServiceImpl implements BahmniObsService {
     private List<String> getConceptNames(Collection<Concept> concepts) {
         List<String> conceptNames = new ArrayList<>();
         for (Concept concept : concepts) {
-            conceptNames.add(concept.getName().getName());
+            if(concept != null) {
+                conceptNames.add(getConceptName(concept, Context.getLocale()));
+            }
         }
         return conceptNames;
+    }
+
+    private String getConceptName(Concept concept, Locale searchLocale) {
+        if (concept.getName(searchLocale) != null)
+            return concept.getName(searchLocale).getName();
+        else
+            return concept.getName(LocaleUtility.getDefaultLocale()).getName();
     }
 
     @Override
@@ -91,7 +102,8 @@ public class BahmniObsServiceImpl implements BahmniObsService {
     private List<BahmniObservation> convertToBahmniObservation(List<Obs> observations) {
         List<BahmniObservation> bahmniObservations = new ArrayList<>();
         for (Obs observation : observations) {
-            BahmniObservation bahmniObservation = omrsObsToBahmniObsMapper.map(observation);
+            BahmniObservation bahmniObservation = omrsObsToBahmniObsMapper.map(observation, null);
+            bahmniObservation.setObservationDateTime(observation.getObsDatetime());
             bahmniObservations.add(bahmniObservation);
         }
         return bahmniObservations;
@@ -147,7 +159,7 @@ public class BahmniObsServiceImpl implements BahmniObsService {
             return new ArrayList<>();
         for (Concept concept : concepts) {
             List<Obs> observations = obsDao.getObsByPatientAndVisit(patientUuid, Arrays.asList(concept.getName().getName()),
-                    visitDao.getVisitIdsFor(patientUuid, numberOfVisits), -1, ObsDaoImpl.OrderBy.DESC, obsIgnoreList, filterOutOrderObs, order, null, null);
+                    visitDao.getVisitIdsFor(patientUuid, numberOfVisits), Integer.MAX_VALUE, ObsDaoImpl.OrderBy.DESC, obsIgnoreList, filterOutOrderObs, order, null, null);
             if (CollectionUtils.isNotEmpty(observations)) {
                 latestObs.addAll(filterIgnoredObs(obsIgnoreList, getAllLatestObsForAConcept(observations)));
             }
@@ -262,7 +274,7 @@ public class BahmniObsServiceImpl implements BahmniObsService {
     @Override
     public BahmniObservation getBahmniObservationByUuid(String observationUuid) {
         Obs obs = obsService.getObsByUuid(observationUuid);
-        return omrsObsToBahmniObsMapper.map(obs);
+        return omrsObsToBahmniObsMapper.map(obs, null);
     }
 
     @Override
@@ -271,7 +283,7 @@ public class BahmniObsServiceImpl implements BahmniObsService {
         if (obs.getVoided()) {
             obs = getRevisionObs(obs);
         }
-        return omrsObsToBahmniObsMapper.map(obs);
+        return omrsObsToBahmniObsMapper.map(obs, null);
     }
 
     @Override

@@ -12,7 +12,7 @@
 
     <property name="now" value="now()"/>
 
-    <changeSet id="bahmni-setup-6" author="tw" context="rel3">
+    <changeSet id="bahmni-setup-6-updated" author="tw" context="rel3">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">
                 SELECT COUNT(*) FROM concept_reference_source where name = 'org.openmrs.module.emrapi';
@@ -26,7 +26,7 @@
             <column name="date_created" valueDate="${now}"/>
             <column name="creator" value="1"/>
         </insert>
-        <modifySql dbms="mysql">
+        <modifySql dbms="mysql,mariadb">
             <replace replace="name-of-uuid-function" with="UUID()"/>
         </modifySql>
     </changeSet>
@@ -460,8 +460,7 @@
         <preConditions onFail="MARK_RAN">
     		<sqlCheck expectedResult="0">
     			select count(*) from concept_name cn inner join concept c on cn.concept_id = c.concept_id where cn.name = 'REFERRED_OUT'
-    			and cn.concept_name_type = 'FULLY_SPECIFIED' and c.datatype_id = (SELECT concept_datatype_id FROM concept_datatype WHERE name = 'N/A')
-    			and c.class_id = (SELECT concept_class_id FROM concept_class WHERE name = 'Misc');
+    			and cn.concept_name_type = 'FULLY_SPECIFIED' and c.class_id = (SELECT concept_class_id FROM concept_class WHERE name = 'Misc');
     		</sqlCheck>
     	</preConditions>
         <comment>Add new concept to mark referred out tests</comment>
@@ -1150,37 +1149,32 @@
             `property_value`=@concept_set_uuid;
         </sql>
     </changeSet>
-    <changeSet id="bahmni-core-201906101318" author="Vinay, Indraneel, Samuel34">
+    <changeSet id="bahmni-core-202305121314" author="Angshu">
         <preConditions onFail="MARK_RAN">
-        	<sqlCheck expectedResult="0">
-        		select count(*) from global_property where property = 'order.durationUnitsConceptUuid';
-        	</sqlCheck>
+            <sqlCheck expectedResult="1">
+                select count(*) from global_property where property = 'order.durationUnitsConceptUuid' and property_value IS NULL;
+            </sqlCheck>
         </preConditions>
-        <comment>Adding duration unit concepts and setting up associated global property</comment>
+        <comment>Adding duration unit concepts and setting up associated global property. CIEL dataset should create the actual members. this is replacement of changeset bahmni-core-201906101318</comment>
         <sql>
             set @concept_id = 0;
             set @concept_name_short_id = 0;
             set @concept_name_full_id = 0;
-            call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id, 'Duration Units', 'duration units', 'N/A', 'ConvSet', true);
-            set @set_concept_id = @concept_id;
-            call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id, 'Days', 'days', 'N/A', 'Misc', false);
-            call add_concept_set_members (@set_concept_id,@concept_id,1);
+            call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id, 'Duration Units', 'duration units', 'Coded', 'ConvSet', true);
 
-            select c.uuid from concept_name cn inner join concept c on cn.concept_id = c.concept_id where cn.name = 'Duration Units' and cn.concept_name_type = 'FULLY_SPECIFIED' into @concept_set_uuid;
-            select uuid() into @uuid;
+            update concept set uuid = '1732AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' where concept_id=@concept_id;
 
             insert into global_property
             (`property`,
-            `property_value`,
-            `description`,
-            `uuid`)
+             `property_value`,
+             `description`,
+             `uuid`)
             values
-            ('order.durationUnitsConceptUuid',
-            @concept_set_uuid,
-            'Global property pointing to duration units concept set',
-            @uuid)
-            ON DUPLICATE KEY UPDATE
-            `property_value`=@concept_set_uuid;
+                ('order.durationUnitsConceptUuid',
+                 '1732AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+                 'Global property pointing to duration units concept set',
+                 @uuid)
+            ON DUPLICATE KEY UPDATE `property_value`='1732AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
         </sql>
     </changeSet>
     <changeSet id="bahmni-core-201407171715" author="Vinay, Indraneel">
@@ -1288,19 +1282,19 @@
     	<comment>Introducing import status table</comment>
     	<sql>
     		CREATE TABLE import_status (
-    			id INT AUTO_INCREMENT NOT NULL, 
-    			original_file_name VARCHAR(500) NOT NULL, 
-    			saved_file_name VARCHAR(500) NOT NULL, 
-    			error_file_name VARCHAR(500) NULL, 
-    			type VARCHAR(25) NOT NULL, 
-    			status VARCHAR(25) NOT NULL, 
-    			successful_records NUMERIC(6) NULL, 
-    			failed_records NUMERIC(6) NULL, 
-    			stage_name VARCHAR(10) NULL, 
-    			stack_trace TEXT NULL, 
-    			uploaded_by VARCHAR(20) NOT NULL, 
-    			start_time TIMESTAMP NULL DEFAULT NULL, 
-    			end_time TIMESTAMP NULL DEFAULT NULL, 
+    			id INT AUTO_INCREMENT NOT NULL,
+    			original_file_name VARCHAR(500) NOT NULL,
+    			saved_file_name VARCHAR(500) NOT NULL,
+    			error_file_name VARCHAR(500) NULL,
+    			type VARCHAR(25) NOT NULL,
+    			status VARCHAR(25) NOT NULL,
+    			successful_records NUMERIC(6) NULL,
+    			failed_records NUMERIC(6) NULL,
+    			stage_name VARCHAR(10) NULL,
+    			stack_trace TEXT NULL,
+    			uploaded_by VARCHAR(20) NOT NULL,
+    			start_time TIMESTAMP NULL DEFAULT NULL,
+    			end_time TIMESTAMP NULL DEFAULT NULL,
     			CONSTRAINT import_status_pk PRIMARY KEY (id));
     	</sql>
     </changeSet>
@@ -1405,193 +1399,6 @@
             select @labresults_concept_id := concept_id, min(concept_id) from concept_name where name = 'LABRESULTS_CONCEPT' GROUP BY concept_id;
             set @set_concept_id = @concept_id;
             call add_concept_set_members (@labresults_concept_id,@set_concept_id,1);
-        </sql>
-    </changeSet>
-
-    <changeSet id="bahmni-core-201409241028" author="Hemanth">
-        <validCheckSum>3:48db15b4c8ef5eb006f8bb9a82854735</validCheckSum>
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">select count(*) from concept_reference_source where name='ISO 8601 Duration'</sqlCheck>
-        </preConditions>
-        <comment>Insert concept reference source for Duration units</comment>
-        <sql>
-            set @uuid = 0;
-            select uuid() into @uuid;
-
-            insert into concept_reference_source (name, description, hl7_code, creator, date_created, uuid)
-            values('ISO 8601 Duration', 'ISO 8601 Duration Source', 'SCT', 1, now(), @uuid);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409241048" author="Hemanth">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">select count(*) from concept_reference_term where name='Second(s)'</sqlCheck>
-        </preConditions>
-        <comment>Insert concept reference term for Second(s)</comment>
-        <sql>
-            set @uuid = 0;
-            set @source_id = 0;
-
-            select uuid() into @uuid;
-            select concept_source_id from concept_reference_source where name='ISO 8601 Duration' into @source_id;
-
-            insert into concept_reference_term(concept_source_id, name, code, description, creator, date_created, uuid)
-            values(@source_id, 'Second(s)', '257997001', 'Duration in Second(s)', 1, now(), @uuid);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409241115" author="Hemanth">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">select count(*) from concept_reference_term where name='Minute(s)'</sqlCheck>
-        </preConditions>
-        <comment>Insert concept reference term for Minute(s)</comment>
-        <sql>
-            set @uuid = 0;
-            set @source_id = 0;
-
-            select uuid() into @uuid;
-            select concept_source_id from concept_reference_source where name='ISO 8601 Duration' into @source_id;
-
-            insert into concept_reference_term(concept_source_id, name, code, description, creator, date_created, uuid)
-            values(@source_id, 'Minute(s)', '258701004', 'Duration in Minute(s)', 1, now(), @uuid);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409241116" author="Hemanth">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">select count(*) from concept_reference_term where name='Hour(s)'</sqlCheck>
-        </preConditions>
-        <comment>Insert concept reference term for Hour(s)</comment>
-        <sql>
-            set @uuid = 0;
-            set @source_id = 0;
-
-            select uuid() into @uuid;
-            select concept_source_id from concept_reference_source where name='ISO 8601 Duration' into @source_id;
-
-            insert into concept_reference_term(concept_source_id, name, code, description, creator, date_created, uuid)
-            values(@source_id, 'Hour(s)', '258702006', 'Duration in Hour(s)', 1, now(), @uuid);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409241117" author="Hemanth">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">select count(*) from concept_reference_term where name='Day(s)'</sqlCheck>
-        </preConditions>
-        <comment>Insert concept reference term for Day(s)</comment>
-        <sql>
-            set @uuid = 0;
-            set @source_id = 0;
-
-            select uuid() into @uuid;
-            select concept_source_id from concept_reference_source where name='ISO 8601 Duration' into @source_id;
-
-            insert into concept_reference_term(concept_source_id, name, code, description, creator, date_created, uuid)
-            values(@source_id, 'Day(s)', '258703001', 'Duration in Day(s)', 1, now(), @uuid);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409241119" author="Hemanth">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">select count(*) from concept_reference_term where name='Week(s)'</sqlCheck>
-        </preConditions>
-        <comment>Insert concept reference term for Week(s)</comment>
-        <sql>
-            set @uuid = 0;
-            set @source_id = 0;
-
-            select uuid() into @uuid;
-            select concept_source_id from concept_reference_source where name='ISO 8601 Duration' into @source_id;
-
-            insert into concept_reference_term(concept_source_id, name, code, description, creator, date_created, uuid)
-            values(@source_id, 'Week(s)', '258705008', 'Duration in Week(s)', 1, now(), @uuid);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409241120" author="Hemanth">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">select count(*) from concept_reference_term where name='Month(s)'</sqlCheck>
-        </preConditions>
-        <comment>Insert concept reference term for Month(s)</comment>
-        <sql>
-            set @uuid = 0;
-            set @source_id = 0;
-
-            select uuid() into @uuid;
-            select concept_source_id from concept_reference_source where name='ISO 8601 Duration' into @source_id;
-
-            insert into concept_reference_term(concept_source_id, name, code, description, creator, date_created, uuid)
-            values(@source_id, 'Month(s)', '258706009', 'Duration in Week(s)', 1, now(), @uuid);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409241122" author="Hemanth">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">select count(*) from concept_reference_term where name='Year(s)'</sqlCheck>
-        </preConditions>
-        <comment>Insert concept reference term for Year(s)</comment>
-        <sql>
-            set @uuid = 0;
-            set @source_id = 0;
-
-            select uuid() into @uuid;
-            select concept_source_id from concept_reference_source where name='ISO 8601 Duration' into @source_id;
-
-            insert into concept_reference_term(concept_source_id, name, code, description, creator, date_created, uuid)
-            values(@source_id, 'Year(s)', '258707000', 'Duration in Year(s)', 1, now(), @uuid);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409241123" author="Hemanth">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="0">select count(*) from concept_reference_term where name='Time(s)'</sqlCheck>
-        </preConditions>
-        <comment>Insert concept reference term for Time(s)</comment>
-        <sql>
-            set @uuid = 0;
-            set @source_id = 0;
-
-            select uuid() into @uuid;
-            select concept_source_id from concept_reference_source where name='ISO 8601 Duration' into @source_id;
-
-            insert into concept_reference_term(concept_source_id, name, code, description, creator, date_created, uuid)
-            values(@source_id, 'Time(s)', '252109000', 'Duration in Time(s)', 1, now(), @uuid);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409041530" author="Rohan, Sravanthi">
-        <validCheckSum>3:f2057b5f013e4faea7a403e2ef20e13d</validCheckSum>
-        <validCheckSum>3:30a534a584da0e66d93a6dc1093fd2a1</validCheckSum>
-        <comment>Adding hours, weeks and months concepts for drug order duration units</comment>
-        <sql>
-            set @concept_id = 0;
-            set @concept_name_short_id = 0;
-            set @concept_name_full_id = 0;
-            set @quantityUnits_concept_id = 0;
-            set @concept_map_type_id = 0;
-            set @concept_reference_term_id = 0;
-
-            select concept_id from concept_name where name = 'Duration Units' and concept_name_type = 'FULLY_SPECIFIED' into @set_concept_id;
-            select concept_map_type_id from concept_map_type where name='SAME-AS' into @concept_map_type_id;
-
-            call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id,'Hours','hours', 'N/A', 'Misc', false);
-            call add_concept_set_members (@set_concept_id,@concept_id,1);
-            select concept_reference_term_id from concept_reference_term where name='Hour(s)' into @concept_reference_term_id;
-            select uuid() into @uuid;
-            insert into concept_reference_map (concept_reference_term_id, concept_map_type_id, concept_id, date_created, creator, uuid) values (
-            @concept_reference_term_id , @concept_map_type_id, @concept_id, now(),1, @uuid);
-
-            select concept_reference_term_id from concept_reference_term where name='Day(s)' into @concept_reference_term_id;
-            select concept_map_type_id from concept_map_type where name='SAME-AS' into @concept_map_type_id;
-            select concept_id from concept_name where name = 'Days' and concept_name_type = 'FULLY_SPECIFIED' into @concept_id;
-            select uuid() into @uuid;
-            insert into concept_reference_map (concept_reference_term_id, concept_map_type_id, concept_id, date_created, creator, uuid) values (
-            @concept_reference_term_id , @concept_map_type_id, @concept_id, now(),1, @uuid);
-
-            call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id,'Weeks','weeks', 'N/A', 'Misc', false);
-            call add_concept_set_members (@set_concept_id,@concept_id,1);
-            select concept_reference_term_id from concept_reference_term where name='Week(s)' into @concept_reference_term_id;
-            select uuid() into @uuid;
-            insert into concept_reference_map (concept_reference_term_id, concept_map_type_id, concept_id, date_created, creator, uuid) values (
-            @concept_reference_term_id , @concept_map_type_id, @concept_id, now(),1, @uuid);
-
-            call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id,'Months','months', 'N/A', 'Misc', false);
-            call add_concept_set_members (@set_concept_id,@concept_id,1);
-            select concept_reference_term_id from concept_reference_term where name='Month(s)' into @concept_reference_term_id;
-            select uuid() into @uuid;
-            insert into concept_reference_map (concept_reference_term_id, concept_map_type_id, concept_id, date_created, creator, uuid) values (
-            @concept_reference_term_id , @concept_map_type_id, @concept_id, now(),1, @uuid);
         </sql>
     </changeSet>
     <changeSet id="bahmni-core-201409091224" author="Mihir, Shruthi">
@@ -1940,51 +1747,9 @@
             call delete_concept('Percutaneous Endoscopic Gastrostomy');
         </sql>
     </changeSet>
-    <changeSet id="bahmni-core-201409291458" author="Chethan,Banka">
-        <comment>Adding concepts and concept set related to quantity units</comment>
+    <changeSet id="bahmni-core-202304192144" author="Angshu">
+        <comment>Removing update of Duration Units concept member name. Replacement of changeset bahmni-core-201409291704. Also only checking for dosing unit Oral</comment>
         <sql>
-            select concept_id into @set_concept_id from concept_name where name = 'Dose Quantity Units' and concept_name_type = 'FULLY_SPECIFIED';
-
-            select concept_id into @concept_id from concept_name where name = 'Tablet' and concept_name_type = 'FULLY_SPECIFIED';
-            call add_concept_set_members (@set_concept_id, @concept_id, 1);
-
-            select concept_id into @concept_id from concept_name where name = 'Capsule' and concept_name_type = 'FULLY_SPECIFIED';
-            call add_concept_set_members (@set_concept_id, @concept_id, 1);
-
-            select concept_id into @concept_id from concept_name where name = 'ml' and concept_name_type = 'FULLY_SPECIFIED';
-            call add_concept_set_members (@set_concept_id, @concept_id, 1);
-
-            select concept_id into @concept_id from concept_name where name = 'mg' and concept_name_type = 'FULLY_SPECIFIED';
-            call add_concept_set_members (@set_concept_id, @concept_id, 1);
-
-            select concept_id into @concept_id from concept_name where name = 'IU' and concept_name_type = 'FULLY_SPECIFIED';
-            call add_concept_set_members (@set_concept_id, @concept_id, 1);
-
-            select concept_id into @concept_id from concept_name where name = 'Unit(s)' and concept_name_type = 'FULLY_SPECIFIED';
-            call add_concept_set_members (@set_concept_id, @concept_id, 1);
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409291704" author="Chethan,Banka">
-        <comment>Changing names for Duration Units, Dose Units</comment>
-        <sql>
-            UPDATE concept_name SET name='Day(s)' where name='Days' and concept_name_type='FULLY_SPECIFIED';
-            UPDATE concept_name SET name='day(s)' where name='days' and concept_name_type='SHORT';
-
-            UPDATE concept_name SET name='Week(s)' where name='Weeks' and concept_name_type='FULLY_SPECIFIED';
-            UPDATE concept_name SET name='week(s)' where name='weeks' and concept_name_type='SHORT';
-
-            UPDATE concept_name SET name='Hour(s)' where name='Hours' and concept_name_type='FULLY_SPECIFIED';
-            UPDATE concept_name SET name='hour(s)' where name='hours' and concept_name_type='SHORT';
-
-            UPDATE concept_name SET name='Month(s)' where name='Months' and concept_name_type='FULLY_SPECIFIED';
-            UPDATE concept_name SET name='month(s)' where name='months' and concept_name_type='SHORT';
-
-            UPDATE concept_name SET name='Tablet(s)' where name='Tablet' and concept_name_type='FULLY_SPECIFIED';
-            UPDATE concept_name SET name='tablet(s)' where name='tablet' and concept_name_type='SHORT';
-
-            UPDATE concept_name SET name='Capsule(s)' where name='Capsule' and concept_name_type='FULLY_SPECIFIED';
-            UPDATE concept_name SET name='capsule(s)' where name='capsule' and concept_name_type='SHORT';
-
             UPDATE concept_name SET name='Oral' where name='Per Os' and concept_name_type='FULLY_SPECIFIED';
         </sql>
     </changeSet>
@@ -2001,19 +1766,6 @@
             UPDATE concept_set, concept_name SET concept_set.sort_weight = 6 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'Drop' and concept_set.concept_set = @dosing_units_concept_id;
             UPDATE concept_set, concept_name SET concept_set.sort_weight = 7 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'Tablespoon' and concept_set.concept_set = @dosing_units_concept_id;
             UPDATE concept_set, concept_name SET concept_set.sort_weight = 8 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'Teaspoon' and concept_set.concept_set = @dosing_units_concept_id;
-            UPDATE concept_set, concept_name SET concept_set.sort_weight = 9 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'Unit(s)' and concept_set.concept_set = @dosing_units_concept_id;
-        </sql>
-    </changeSet>
-    <changeSet id="bahmni-core-201409301255" author="Chethan,Banka">
-        <comment>Changing sort order for dose quantity units</comment>
-        <sql>
-            select concept_id into @dosing_units_concept_id from concept_name where name = 'Dose Quantity Units' and concept_name_type = 'FULLY_SPECIFIED';
-
-            UPDATE concept_set, concept_name SET concept_set.sort_weight = 1 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'Tablet(s)' and concept_set.concept_set = @dosing_units_concept_id;
-            UPDATE concept_set, concept_name SET concept_set.sort_weight = 2 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'Capsule(s)' and concept_set.concept_set = @dosing_units_concept_id;
-            UPDATE concept_set, concept_name SET concept_set.sort_weight = 3 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'ml' and concept_set.concept_set = @dosing_units_concept_id;
-            UPDATE concept_set, concept_name SET concept_set.sort_weight = 4 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'mg' and concept_set.concept_set = @dosing_units_concept_id;
-            UPDATE concept_set, concept_name SET concept_set.sort_weight = 5 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'IU' and concept_set.concept_set = @dosing_units_concept_id;
             UPDATE concept_set, concept_name SET concept_set.sort_weight = 9 where concept_set.concept_id = concept_name.concept_id and concept_name.name = 'Unit(s)' and concept_set.concept_set = @dosing_units_concept_id;
         </sql>
     </changeSet>
@@ -2388,29 +2140,6 @@
             values ('Computed/Editable', 'Computed/Editable', 1, @date, 0, @uuid);
         </sql>
     </changeSet>
-    <changeSet id="bahmni-core-201412160932" author="Rohan, Shruthi">
-        <validCheckSum>3:f77d13ad07ec98f9e3beda3047a09da8</validCheckSum>
-        <validCheckSum>3:e106e85dee90f3b8f62789aa3a3306ed</validCheckSum>
-        <comment>Adding minutes concept for drug order duration units</comment>
-        <sql>
-            set @concept_id = 0;
-            set @concept_name_short_id = 0;
-            set @concept_name_full_id = 0;
-            set @quantityUnits_concept_id = 0;
-            set @concept_map_type_id = 0;
-            set @concept_reference_term_id = 0;
-
-            select concept_id from concept_name where name = 'Duration Units' and concept_name_type = 'FULLY_SPECIFIED' into @set_concept_id;
-            select concept_map_type_id from concept_map_type where name='SAME-AS' into @concept_map_type_id;
-
-            call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id,'Minute(s)','minute(s)', 'N/A', 'Misc', false);
-            call add_concept_set_members (@set_concept_id,@concept_id,1);
-            select concept_reference_term_id from concept_reference_term where name='Minute(s)' into @concept_reference_term_id;
-            select uuid() into @uuid;
-            insert into concept_reference_map (concept_reference_term_id, concept_map_type_id, concept_id, date_created, creator, uuid) values (
-            @concept_reference_term_id , @concept_map_type_id, @concept_id, now(),1, @uuid);
-        </sql>
-    </changeSet>
     <changeSet id="bahmni-core-201412171832" author="Mujir, Mihir">
         <validCheckSum>3:ff3f26723a22f34131d082f64923f708</validCheckSum>
         <preConditions onFail="MARK_RAN">
@@ -2681,6 +2410,7 @@
             insert into order_type_class_map(order_type_id, concept_class_id) values(@order_type_id,@lab_test);
         </sql>
     </changeSet>
+
     <changeSet id="bahmni-core-201505171755" author="Bharat">
         <validCheckSum>3:24754f616857125b862150154fb85150</validCheckSum>
         <preConditions onFail="MARK_RAN">
@@ -3237,7 +2967,7 @@
         </sql>
 
     </changeSet>
-    <changeSet id="20151218-1530-create-program_attribute_type-table" author="Rahul,Swathi" dbms="mysql">
+    <changeSet id="20151218-1530-create-program_attribute_type-table-updated" author="Rahul,Swathi" dbms="mysql,mariadb">
         <preConditions onFail="MARK_RAN">
             <not>
                 <tableExists tableName="program_attribute_type" />
@@ -3402,14 +3132,6 @@
         </createIndex>
     </changeSet>
 
-
-    <changeSet id="20160329-176" author="Pankaj, Achinta">
-        <comment>Make allow decimal checkbox checked for all numeric concept</comment>
-        <sql>
-            UPDATE concept_numeric SET precise = 1 WHERE precise = 0
-        </sql>
-    </changeSet>
-
     <changeSet id="201604261630" author="Gautam">
         <comment>SQL query to get list of active patients by location</comment>
         <sqlFile path="V1_92_PatientSearch.sql"/>
@@ -3534,19 +3256,6 @@
             call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id, 'Cured Diagnosis', 'Cured Diagnosis', 'N/A', 'Misc', true);
         </sql>
     </changeSet>
-    <changeSet id="bahmni-core-201610101525" author="Bharat">
-        <preConditions onFail="MARK_RAN">
-            <sqlCheck expectedResult="1">
-                SELECT COUNT(*) != 0 FROM concept WHERE datatype_id = 1 AND concept_id NOT IN (SELECT concept_id FROM concept_numeric);
-            </sqlCheck>
-        </preConditions>
-        <comment>add concept numeric row to all numeric concepts</comment>
-        <sql>
-            INSERT INTO concept_numeric (concept_id,precise) (SELECT concept_id,0 FROM concept WHERE
-            datatype_id  = (SELECT concept_datatype_id FROM concept_datatype WHERE name = 'Numeric')
-            AND concept_id NOT IN (SELECT concept_id FROM concept_numeric));
-        </sql>
-    </changeSet>
     <changeSet id="bahmni-new-roles-and-privileges" author="Jaswanth, Ravindra">
         <validCheckSum>3:14239025d1eeb1a927e6ab5e0bb85e08</validCheckSum>
         <comment>New roles and privileges for bahmni</comment>
@@ -3555,7 +3264,7 @@
     <changeSet id="bahmni-core-201906201151" author="Samuel34">
     	<preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">
-                select count(*) from users where system_id='superman';
+                select count(*) from users where system_id='superman' or username='superman';
             </sqlCheck>
         </preConditions>
         <comment>Adding superman user</comment>
@@ -3807,11 +3516,18 @@
         </sql>
     </changeSet>
 
+    <changeSet id="20100517-1545-updated" author="wyclif and djazayeri" dbms="mysql,mariadb">
+        <comment>Switch boolean concepts/observations to be stored as coded</comment>
+        <customChange class="org.openmrs.util.databasechange.BooleanConceptChangeSet"/>
+    </changeSet>
+
     <changeSet id="bahmni-core-201701241540" author="Padma">
         <preConditions onFail="HALT">
-            <sqlCheck expectedResult="1">
-                SELECT count(*) from global_property WHERE property = 'concept.true' and property_value is not null;
-            </sqlCheck>
+            <not>
+                <sqlCheck expectedResult="0">
+                    SELECT COUNT(*) FROM global_property WHERE property = 'concept.true' and property_value is not null;
+                </sqlCheck>
+            </not>
         </preConditions>
         <comment>Set value coded for referred out concepts</comment>
         <sql>
@@ -3875,10 +3591,13 @@
         <sqlFile path="V1_98_WardsListSql.sql"/>
     </changeSet>
 
-    <changeSet id="bahmni-201703061748" author="Shruthi P, Pushpa">
+    <changeSet id="bahmni-202212131256" author="Shruthi P, Pushpa">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="1">
                 SELECT count(property) FROM global_property WHERE property='emr.primaryIdentifierType';
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(property) FROM global_property WHERE property='bahmni.primaryIdentifierType';
             </sqlCheck>
         </preConditions>
         <comment>update global property key 'emr.primaryIdentifierType' to 'bahmni.primaryIdentifierType'</comment>
@@ -3938,10 +3657,10 @@
             set @answer_concept_id = 0;
             set @concept_name_short_id = 0;
             set @concept_name_full_id = 0;
-            
+
             call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id, 'Non-Coded Condition',
             'Non-Coded Condition', 'Text', 'Question', false);
-    
+
             update global_property set property_value = (select uuid from concept where concept_id = @concept_id)
             where property = 'conditionList.nonCodedUuid';
         </sql>
@@ -4026,7 +3745,7 @@
             set @answer_concept_id = 0;
             set @concept_name_short_id = 0;
             set @concept_name_full_id = 0;
-            
+
             call add_concept(@concept_id, @concept_name_short_id, @concept_name_full_id, 'Follow-up Condition',
             'Follow-up Condition', 'Text', 'Misc', false);
         </sql>
@@ -4382,7 +4101,7 @@
             INSERT INTO role_privilege(role, privilege) VALUES ("OT: ReadOnly", "app:ot");
         </sql>
     </changeSet>
-    
+
     <changeSet author="Samuel34" id="bahmni-core-201906131441" runOnChange="true">
     	<preConditions onFail="MARK_RAN">
     		<not>
@@ -4406,7 +4125,7 @@
             LEFT OUTER JOIN concept_description ON concept_description.concept_id = concept.concept_id;
         </createView>
     </changeSet>
-    	
+
     <changeSet id="201805112235" author="Suman">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="1">
@@ -4524,4 +4243,444 @@
     		INSERT INTO role_privilege (role, privilege) VALUES ('Anonymous', 'Get Locations');
     	</sql>
     </changeSet>
+    <changeSet id="bahmni-core-202102230936" author="Siva, Rakesh">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM global_property where property = 'bahmni.admin.csv.upload.dateFormat'
+            </sqlCheck>
+        </preConditions>
+        <comment>Add default date format for all CSV imports</comment>
+        <sql>
+            insert into global_property (`property`, `property_value`, `description`, `uuid`)
+            values ('bahmni.admin.csv.upload.dateFormat', 'yyyy-M-d', 'Default date format for all CSV imports', uuid());
+        </sql>
+    </changeSet>
+    <changeSet id="bahmni-core-202202241220" author="Rohit, Deepthi, Soorya, Kavitha">
+        <preConditions onFail="MARK_RAN" >
+            <not><columnExists tableName="concept_numeric" columnName="allow_decimal" /></not>
+        </preConditions>
+        <comment>Rename Column Precise To AllowDecimal in ConceptNumeric Table</comment>
+        <sql>
+            ALTER TABLE concept_numeric CHANGE precise allow_decimal tinyint(1);
+        </sql>
+    </changeSet>
+    <changeSet id="20160329-176-update" author="Pankaj, Achinta">
+        <comment>Make allow decimal checkbox checked for all numeric concept</comment>
+        <sql>
+            UPDATE concept_numeric SET allow_decimal = 1 WHERE allow_decimal = 0
+        </sql>
+    </changeSet>
+    <changeSet id="bahmni-core-201610101525-update" author="Bharat">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) != 0 FROM concept WHERE datatype_id = 1 AND concept_id NOT IN (SELECT concept_id FROM concept_numeric);
+            </sqlCheck>
+        </preConditions>
+        <comment>add concept numeric row to all numeric concepts</comment>
+        <sql>
+            INSERT INTO concept_numeric (concept_id,allow_decimal) (SELECT concept_id,0 FROM concept WHERE
+            datatype_id  = (SELECT concept_datatype_id FROM concept_datatype WHERE name = 'Numeric')
+            AND concept_id NOT IN (SELECT concept_id FROM concept_numeric));
+        </sql>
+    </changeSet>
+
+    <changeSet id="Create-practitioner_type-20220722" author="BAHMNI">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM provider_attribute_type where name="practitioner_type";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding provider attribute type of practitioner_type</comment>
+        <sql>
+            INSERT INTO provider_attribute_type (name, description, datatype, preferred_handler,handler_config, min_occurs, creator, date_created,
+            retired, uuid)
+            VALUES ("practitioner_type","list of practitioners",
+            "org.openmrs.customdatatype.datatype.SpecifiedTextOptionsDatatype","org.openmrs.web.attribute.handler.SpecifiedTextOptionsDropdownHandler",",Doctor", 0, 1, NOW(), 0, UUID());
+        </sql>
+    </changeSet>
+    <changeSet id="Update-metadatamapping_metadata_term_mapping-20220907" author="BAHMNI" >
+        <preConditions onFail="CONTINUE" >
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) from patient_identifier_type where name='Patient Identifier';
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) from metadatamapping_metadata_term_mapping WHERE code="emr.primaryIdentifierType";
+            </sqlCheck>
+        </preConditions>
+        <comment>Updating metadata_uuid in metadatamapping_metadata_term_mapping with primaryIdentifier uuid to remove exceptions in landing page of Lab Entry</comment>
+        <sql>
+			set @metadata_uuid = null;
+			SELECT uuid INTO @metadata_uuid FROM patient_identifier_type WHERE name = "Patient Identifier";
+			UPDATE metadatamapping_metadata_term_mapping SET metadata_uuid=@metadata_uuid WHERE code="emr.primaryIdentifierType";
+        </sql>
+    </changeSet>
+
+
+    <changeSet id="bahmni-emrapi-202208101439" author="BAHMNI" >
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select count(c.concept_id) from concept c
+                INNER join concept_name cn
+                on cn.concept_id=c.concept_id and cn.name='Visit Diagnoses' and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' and c.version is null;
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                <!-- The below query returns the concept which has only one concept reference mapping !-->
+                select count(rmap.concept_id) from concept_reference_map rmap
+                INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Visit Diagnoses'
+                and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+            </sqlCheck>
+        </preConditions>
+        <comment>Update version for the 'Visit Diagnoses' concept because Bahmni concept can be uniquely recognised and doens’t clash with CIEL, or other concepts</comment>
+        <sql>
+            SET @concept_id = 0;
+
+            select rmap.concept_id into @concept_id from concept_reference_map rmap
+            INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Visit Diagnoses'
+            and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+
+            UPDATE concept set version = 'BAHMNI-CORE-1.0' where concept_id = @concept_id and version is null ;
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-emrapi-202208101440" author="BAHMNI" >
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select count(c.concept_id) from concept c
+                INNER join
+                concept_name cn
+                on cn.concept_id=c.concept_id and cn.name='Coded Diagnosis' and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' and c.version is null;
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                <!-- The below query returns the concept which has only one concept reference mapping !-->
+                select count(rmap.concept_id) from concept_reference_map rmap
+                INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Coded Diagnosis'
+                and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+            </sqlCheck>
+        </preConditions>
+        <comment>Update version for the 'Coded Diagnosis' concept because Bahmni concept can be uniquely recognised and doens’t clash with CIEL, or other concepts</comment>
+        <sql>
+            SET @concept_id = 0;
+
+            select rmap.concept_id into @concept_id from concept_reference_map rmap
+            INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Coded Diagnosis'
+            and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+
+            UPDATE concept set version='BAHMNI-CORE-1.0' where concept_id=@concept_id and version is null ;
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-emrapi-202208101441" author="BAHMNI">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select count(c.concept_id) from concept c
+                INNER join
+                concept_name cn
+                on cn.concept_id=c.concept_id and cn.name='Non-coded Diagnosis' and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' and c.version is null;
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                <!-- The below query returns the concept which has only one concept reference mapping !-->
+                select count(rmap.concept_id) from concept_reference_map rmap
+                INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Non-coded Diagnosis'
+                and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+            </sqlCheck>
+        </preConditions>
+        <comment>Update version for the 'Non-Coded Diagnosis' concept because Bahmni concept can be uniquely recognised and doens’t clash with CIEL, or other concepts</comment>
+        <sql>
+            SET @concept_id = 0;
+
+            select rmap.concept_id into @concept_id from concept_reference_map rmap
+            INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Non-coded Diagnosis'
+            and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+
+            UPDATE concept set version='BAHMNI-CORE-1.0' where concept_id=@concept_id and version is null ;
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-emrapi-202208101442" author="BAHMNI">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select count(c.concept_id) from concept c
+                INNER join
+                concept_name cn
+                on cn.concept_id=c.concept_id and cn.name='Diagnosis Certainty' and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' and c.version is null;
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                <!-- The below query returns the concept which has only one concept reference mapping !-->
+                select count(rmap.concept_id) from concept_reference_map rmap
+                INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Diagnosis Certainty'
+                and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+            </sqlCheck>
+        </preConditions>
+        <comment>Update version for the 'Diagnosis Certainty' concept because Bahmni concept can be uniquely recognised and doens’t clash with CIEL, or other concepts</comment>
+        <sql>
+            SET @concept_id = 0;
+
+            select rmap.concept_id into @concept_id from concept_reference_map rmap
+            INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Diagnosis Certainty'
+            and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+
+            UPDATE concept set version='BAHMNI-CORE-1.0' where concept_id=@concept_id and version is null ;
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-emrapi-202208101443" author="BAHMNI">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select count(c.concept_id) from concept c
+                INNER join
+                concept_name cn
+                on cn.concept_id=c.concept_id and cn.name='Diagnosis order' and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' and c.version is null;
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                <!-- The below query returns the concept which has only one concept reference mapping !-->
+                select count(rmap.concept_id) from concept_reference_map rmap
+                INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Diagnosis order'
+                and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+            </sqlCheck>
+        </preConditions>
+        <comment>Update version for the 'Diagnosis order' concept because Bahmni concept can be uniquely recognised and doens’t clash with CIEL, or other concepts</comment>
+        <sql>
+            SET @concept_id = 0;
+
+            select rmap.concept_id into @concept_id from concept_reference_map rmap
+            INNER JOIN concept_name cn on cn.concept_id = rmap.concept_id and cn.name='Diagnosis order'
+            and cn.concept_name_type='FULLY_SPECIFIED' and cn.voided=0 and cn.locale = 'en' group by rmap.concept_id having count(*) = 1;
+
+            UPDATE concept set version='BAHMNI-CORE-1.0' where concept_id=@concept_id and version is null ;
+        </sql>
+    </changeSet>
+    <changeSet id="emrapi-diganosis-202209121241" author="Bindu">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select count(*) from global_property where property='emrapi.useLegacyDiagnosisService' and property_value='FALSE';
+            </sqlCheck>
+        </preConditions>
+        <comment>set 'emrapi.useLegacyDiagnosisService' to true to use legacy diagnosis service</comment>
+        <sql>
+            UPDATE global_property set property_value='TRUE' where property='emrapi.useLegacyDiagnosisService';
+        </sql>
+    </changeSet>
+    <changeSet id="bahmni-202212131258" author="Bindu, Rohit, Deepthi">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(property) FROM global_property WHERE property='emr.primaryIdentifierType' AND property='bahmni.primaryIdentifierType';
+            </sqlCheck>
+        </preConditions>
+        <comment>Remove global property with value 'emr.primaryIdentifierType' to avoid duplications</comment>
+        <sql>
+            DELETE FROM global_property WHERE property='emr.primaryIdentifierType';
+        </sql>
+    </changeSet>
+    <changeSet id="bahmni-202212131913" author="Bindu, Rohit">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(property) FROM global_property WHERE property='bahmni.primaryIdentifierType';
+            </sqlCheck>
+        </preConditions>
+        <comment>Update gobal property with Patient Identifier uuid</comment>
+        <sql>
+            SELECT uuid INTO @uuid FROM patient_identifier_type WHERE name='Patient Identifier';
+            UPDATE global_property SET property_value=@uuid WHERE property='bahmni.primaryIdentifierType';
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-202302231447" author="BAHMNI">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM privilege WHERE privilege = "Create Teleconsultation";
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM role_privilege WHERE role = "Appointments:ManageAppointments" and privilege = "Create Teleconsultation";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding Create Teleconsultation privilege to Appointments:ManageAppointments role</comment>
+        <sql>
+            INSERT INTO role_privilege(role, privilege) VALUES ("Appointments:ManageAppointments", "Create Teleconsultation");
+        </sql>
+    </changeSet>
+    <changeSet id="bahmni-core-202303029-BAH-2652" author="clinic-config">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select count(*) from order_type where name='Lab Order';
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                select count(*) from concept_class where name='Test';
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                select count(*) from order_type_class_map where order_type_id=(select order_type_id from order_type where name = 'Lab Order') and concept_class_id=(select concept_class_id from concept_class where name = 'Test');
+            </sqlCheck>
+        </preConditions>
+        <comment>Associating Test concept classes to Lab Order order type</comment>
+        <sql>
+            set @order_type_id = '';
+            set @test_class = '';
+
+            select order_type_id into @order_type_id from order_type where name = 'Lab Order';
+            select concept_class_id into @test_class from concept_class where name = 'Test';
+
+            insert into order_type_class_map(order_type_id, concept_class_id) values(@order_type_id,@test_class);
+        </sql>
+    </changeSet>
+    <changeSet id="clinic-config-BAH2652-2932023" author="clinic-config">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM concept_class where name = 'Radiology/Imaging Procedure';
+            </sqlCheck>
+        </preConditions>
+        <comment>Add concept class for Radiology/Imaging Procedure</comment>
+        <sql>
+            insert into concept_class (name, description, creator, date_created, retired, uuid)
+            values ('Radiology/Imaging Procedure', 'Radiology Orders', 1, NOW(), 0, 'c6664c16-16b4-4bf4-91da-93f2ac88a0eb');
+        </sql>
+    </changeSet>
+    <changeSet id="bahmni-core-20230329-bah-265229032023" author="clinic-config">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select count(*) from order_type where name='Radiology Order';
+            </sqlCheck>
+            <sqlCheck expectedResult="1">
+                select count(*) from concept_class where name='Radiology/Imaging Procedure';
+            </sqlCheck>
+            <sqlCheck expectedResult="0">
+                select count(*) from order_type_class_map where order_type_id=(select order_type_id from order_type where name = 'Radiology Order') and concept_class_id=(select concept_class_id from concept_class where name = 'Radiology/Imaging Procedure');
+            </sqlCheck>
+        </preConditions>
+        <comment>Associating Radiology/Imaging Procedure concept class to Radiology Order order type</comment>
+        <sql>
+            set @radiology_order_type_id = '';
+            set @radiology_imaging = '';
+
+            select order_type_id into @radiology_order_type_id from order_type where name = 'Radiology Order';
+            select concept_class_id into @radiology_imaging from concept_class where name = 'Radiology/Imaging Procedure';
+
+            insert into order_type_class_map(order_type_id, concept_class_id) values(@radiology_order_type_id,@radiology_imaging);
+        </sql>
+    </changeSet>
+    <changeSet author="Bindu" id="notes-202307091607">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="notes"/>
+            </not>
+        </preConditions>
+        <createTable tableName="notes">
+            <column autoIncrement="true" name="note_id" type="INT">
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="note_type_id" type="INT"/>
+            <column name="note_text" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="date_created" type="datetime">
+                <constraints nullable="false"/>
+            </column>
+            <column name="note_date" type="datetime">
+                <constraints nullable="false"/>
+            </column>
+            <column defaultValueNumeric="0" name="creator" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="voided_by" type="INT"/>
+            <column name="location_id" type="INT">
+            </column>
+            <column name="changed_by" type="INT"/>
+            <column name="date_changed" type="datetime"/>
+            <column name="date_voided" type="datetime"/>
+            <column name="void_reason" type="TEXT"/>
+            <column defaultValueBoolean="false" name="is_voided" type="BOOLEAN">
+                <constraints nullable="false" />
+            </column>
+            <column name="uuid" type="CHAR(38)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+        </createTable>
+
+        <addNotNullConstraint tableName="notes" columnName="uuid" columnDataType="char(38)" />
+
+        <addForeignKeyConstraint baseColumnNames="creator"
+                                 baseTableName="notes" constraintName="user_who_created_notes"
+                                 referencedColumnNames="user_id" referencedTableName="users" />
+
+        <addForeignKeyConstraint baseColumnNames="changed_by"
+                                 baseTableName="notes" constraintName="user_who_changed_notes"
+                                 referencedColumnNames="user_id" referencedTableName="users" />
+
+        <addForeignKeyConstraint baseColumnNames="location_id"
+                                 baseTableName="notes" constraintName="location_notes"
+                                 referencedColumnNames="location_id" referencedTableName="location" />
+
+        <createIndex tableName="notes" unique="true" indexName="notes_uuid_index" >
+            <column name="uuid" />
+        </createIndex>
+
+    </changeSet>
+    <changeSet author="Bindu" id="note-type-202307101601">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="note_type"/>
+            </not>
+        </preConditions>
+        <createTable tableName="note_type">
+            <column defaultValueNumeric="0" name="note_type_id" type="INT">
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="name" type="VARCHAR(50)">
+            <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="uuid" type="CHAR(38)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+        </createTable>
+
+        <addNotNullConstraint tableName="note_type" columnName="uuid" columnDataType="char(38)" />
+
+        <createIndex tableName="note_type" unique="true" indexName="note_type_uuid_index" >
+            <column name="uuid" />
+        </createIndex>
+    </changeSet>
+    <changeSet id="note-name-202307241600" author="Bindu">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                select count(*) from note_type where name = 'OT module';
+            </sqlCheck>
+        </preConditions>
+        <comment> Adding note type </comment>
+        <sql>
+            insert into note_type (name, description, uuid) values ('OT module', 'OT module', uuid());
+        </sql>
+    </changeSet>
+    <include file="addAtomfeedMigrations.xml"/>
+    <changeSet id="provider-attribute-login-locations-202307191200" author="BAHMNI">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM provider_attribute_type where name="Login Locations";
+            </sqlCheck>
+        </preConditions>
+        <comment>Adding provider attribute type - Login Locations</comment>
+        <sql>
+            INSERT INTO provider_attribute_type (name, description, datatype, min_occurs, creator, date_created, retired, uuid)
+            VALUES ("Login Locations","Specific locations for providers to login", "org.openmrs.customdatatype.datatype.LocationDatatype", 0, 1, NOW(), 0, UUID());
+        </sql>
+    </changeSet>
+
+    <changeSet id="bahmni-core-20231206-bah-3336" author="BAHMNI">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) FROM program_attribute_type where name = 'Stage' AND datatype =
+                'org.bahmni.module.bahmnicore.customdatatype.datatype.CodedConceptDatatype';
+            </sqlCheck>
+        </preConditions>
+        <comment>Update datatype of patient stage program attribute type</comment>
+        <sql>
+            UPDATE program_attribute_type SET datatype = 'org.openmrs.customdatatype.datatype.ConceptDatatype' WHERE
+            name = 'Stage' AND datatype = 'org.bahmni.module.bahmnicore.customdatatype.datatype.CodedConceptDatatype';
+        </sql>
+    </changeSet>
+    <changeSet id="bahmni-WardsList-Update-202406271807" author="Bahmni">
+        <comment>Update the wards list sql to optimize for MySQL 8 - Bahmni Standard 1.0</comment>
+        <sqlFile path="V1_99_WardsListSql.sql"/>
+    </changeSet>
+
 </databaseChangeLog>

@@ -6,9 +6,9 @@ import org.bahmni.module.admin.config.service.BahmniConfigService;
 import org.bahmni.module.bahmnicore.contract.drugorder.DrugOrderConfigResponse;
 import org.bahmni.module.bahmnicore.contract.encounter.data.ConceptData;
 import org.bahmni.module.bahmnicore.contract.encounter.response.EncounterConfigResponse;
-import org.bahmni.module.bahmnicore.contract.patient.response.PatientConfigResponse;
 import org.bahmni.module.bahmnicore.service.BahmniDrugOrderService;
-import org.bahmni.module.bahmnicore.service.BahmniPatientService;
+import org.bahmni.module.bahmnicommons.api.contract.patient.response.PatientConfigResponse;
+import org.bahmni.module.bahmnicommons.api.service.BahmniPatientService;
 import org.openmrs.Concept;
 import org.openmrs.EncounterType;
 import org.openmrs.OrderType;
@@ -18,6 +18,7 @@ import org.openmrs.api.EncounterService;
 import org.openmrs.api.OrderService;
 import org.openmrs.api.VisitService;
 import org.openmrs.module.rulesengine.engine.RulesEngine;
+import org.openmrs.module.rulesengine.engine.RulesEngineImpl;
 import org.openmrs.module.webservices.rest.web.RestConstants;
 import org.openmrs.module.webservices.rest.web.v1_0.controller.BaseRestController;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,8 +51,7 @@ public class BahmniConfigController extends BaseRestController {
     @Autowired
     private OrderService orderService;
 
-    @Autowired
-    private RulesEngine rulesEngine;
+    private RulesEngine rulesEngine = new RulesEngineImpl();
 
     @RequestMapping(method = RequestMethod.GET)
     @ResponseBody

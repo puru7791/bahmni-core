@@ -39,6 +39,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.powermock.api.mockito.PowerMockito.when;
 
@@ -105,7 +106,7 @@ public class BahmniDrugOrderMapperTest {
         List<DrugOrder> drugOrderList = new ArrayList<>();
         drugOrderList.add(drugOrder1);
 
-        List<BahmniDrugOrder> mappedDrugOrders = bahmniDrugOrderMapper.mapToResponse(drugOrderList, null, new HashMap<String, DrugOrder>());
+        List<BahmniDrugOrder> mappedDrugOrders = bahmniDrugOrderMapper.mapToResponse(drugOrderList, null, new HashMap<String, DrugOrder>(), null);
         assertEquals(1, mappedDrugOrders.size());
         BahmniDrugOrder mappedOrder = mappedDrugOrders.get(0);
 
@@ -118,7 +119,7 @@ public class BahmniDrugOrderMapperTest {
         assertEquals("vuuid", mappedOrder.getVisit().getUuid());
         assertEquals("{\"dose\": \"2.0\", \"doseUnits\": \"Tablet\"}", mappedOrder.getDosingInstructions().getAdministrationInstructions());
         assertEquals(visitDate, mappedOrder.getVisit().getStartDateTime());
-        verify(providerMapper);
+        verify(providerMapper, times(1)).map(null);
     }
 
     @Test
@@ -155,7 +156,7 @@ public class BahmniDrugOrderMapperTest {
         List<DrugOrder> drugOrderList = new ArrayList<>();
         drugOrderList.add(drugOrder1);
 
-        List<BahmniDrugOrder> mappedDrugOrders = bahmniDrugOrderMapper.mapToResponse(drugOrderList, null, new HashMap<String, DrugOrder>());
+        List<BahmniDrugOrder> mappedDrugOrders = bahmniDrugOrderMapper.mapToResponse(drugOrderList, null, new HashMap<String, DrugOrder>(),"en");
         assertEquals(1, mappedDrugOrders.size());
         BahmniDrugOrder mappedOrder = mappedDrugOrders.get(0);
 
@@ -172,7 +173,7 @@ public class BahmniDrugOrderMapperTest {
         assertEquals("Orally", mappedOrder.getDosingInstructions().getRoute());
         assertEquals("vuuid", mappedOrder.getVisit().getUuid());
         assertEquals(visitDate, mappedOrder.getVisit().getStartDateTime());
-        verify(providerMapper);
+        verify(providerMapper, times(1)).map(null);
     }
 
     @Test
@@ -234,7 +235,7 @@ public class BahmniDrugOrderMapperTest {
         Map<String, DrugOrder> discontinuedOrders = new HashMap<>();
         discontinuedOrders.put("1234", drugOrderDiscontinued);
 
-        List<BahmniDrugOrder> mappedDrugOrders = bahmniDrugOrderMapper.mapToResponse(drugOrderList, null, discontinuedOrders);
+        List<BahmniDrugOrder> mappedDrugOrders = bahmniDrugOrderMapper.mapToResponse(drugOrderList, null, discontinuedOrders,"en");
         assertEquals(1, mappedDrugOrders.size());
         BahmniDrugOrder mappedOrder = mappedDrugOrders.get(0);
 
@@ -253,6 +254,48 @@ public class BahmniDrugOrderMapperTest {
         assertEquals(visitDate, mappedOrder.getVisit().getStartDateTime());
         assertEquals(reasonETConcept, mappedOrder.getOrderReasonConcept());
         assertEquals("AEID1234", mappedOrder.getOrderReasonText());
-        verify(providerMapper);
+        verify(providerMapper, times(1)).map(null);
+    }
+
+    @Test
+    public void shouldMapDrugOrderToResponse() throws Exception {
+        DrugOrderBuilder drugBuilder = new DrugOrderBuilder();
+        Date visitDate;
+        Date dateActivated;
+        visitDate = dateActivated = new Date();
+        Date dateScheduled = DateUtils.addDays(dateActivated, 2);
+        Date expireDate = DateUtils.addDays(dateActivated, 20);
+
+
+        Person person = new PersonBuilder().withUUID("puuid").build();
+        Encounter encounter = new EncounterBuilder().build();
+        Visit visit = new VisitBuilder().withPerson(person).withUUID("vuuid").withStartDatetime(visitDate).withEncounter(
+                encounter).build();
+
+        DrugOrder drugOrder = drugBuilder.withDrugName("Paracetamol 120mg/5ml 60ml")
+                .withDosingType(FlexibleDosingInstructions.class)
+                .withDrugForm("Capsule")
+                .withScheduledDate(dateScheduled)
+                .withDateActivated(dateActivated)
+                .withDurationUnits("Week")
+                .withDosingInstructions("{\"dose\": \"2.0\", \"doseUnits\": \"Tablet\"}")
+                .withVisit(visit)
+                .withDuration(18)
+                .withAutoExpireDate(expireDate)
+                .withCreator("testPersonName")
+                .build();
+
+        BahmniDrugOrder mappedDrugOrder = bahmniDrugOrderMapper.mapToResponse(drugOrder, new HashMap<String, DrugOrder>());
+
+        assertEquals("Paracetamol 120mg/5ml 60ml", mappedDrugOrder.getDrug().getName());
+        assertEquals("Capsule", mappedDrugOrder.getDrug().getForm());
+        assertEquals(dateScheduled, mappedDrugOrder.getEffectiveStartDate());
+        assertEquals(expireDate, mappedDrugOrder.getEffectiveStopDate());
+        assertEquals(18, mappedDrugOrder.getDuration(), 0);
+        assertEquals("Week", mappedDrugOrder.getDurationUnits());
+        assertEquals("vuuid", mappedDrugOrder.getVisit().getUuid());
+        assertEquals("{\"dose\": \"2.0\", \"doseUnits\": \"Tablet\"}", mappedDrugOrder.getDosingInstructions().getAdministrationInstructions());
+        assertEquals(visitDate, mappedDrugOrder.getVisit().getStartDateTime());
+        verify(providerMapper, times(1)).map(null);
     }
 }

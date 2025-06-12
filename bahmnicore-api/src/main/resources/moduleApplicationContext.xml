@@ -10,14 +10,25 @@
 
     <context:component-scan base-package="org.bahmni.module"/>
 
-    <bean id="sqlSearchService" class="org.bahmni.module.bahmnicore.service.impl.SqlSearchServiceImpl">
+    <bean id="queryParamStore" class="org.bahmni.module.bahmnicore.service.impl.SqlSearchParamStoreImpl">
         <property name="administrationService" ref="adminService"/>
+    </bean>
+
+    <bean id="sqlSearchServiceTarget" class="org.bahmni.module.bahmnicore.service.impl.SqlSearchServiceImpl">
+        <property name="administrationService" ref="adminService"/>
+        <property name="searchParamStore" ref="queryParamStore"/>
+    </bean>
+
+    <bean id="sqlSearchService" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
+        <property name="transactionManager" ref="transactionManager"/>
+        <property name="target" ref="sqlSearchServiceTarget"/>
+        <property name="preInterceptors" ref="serviceInterceptors"/>
+        <property name="transactionAttributeSource" ref="transactionAttributeSource"/>
     </bean>
 
     <util:list id="servicePostInterceptors">
         <ref bean="patientProgramAdviceInterceptor"/>
     </util:list>
-
 
     <bean id="orderDao" class="org.bahmni.module.bahmnicore.dao.impl.OrderDaoImpl" />
 
@@ -46,7 +57,7 @@
 
     <bean name="bahmniProgramWorkflowService" class="org.bahmni.module.bahmnicore.service.impl.BahmniProgramWorkflowServiceImpl">
         <property name="programWorkflowDAO">
-            <bean class="org.bahmni.module.bahmnicore.dao.impl.BahmniHibernateProgramWorkflowDAOImpl">
+            <bean class="org.openmrs.api.db.hibernate.HibernateProgramWorkflowDAO">
                 <property name="sessionFactory">
                     <ref bean="sessionFactory" />
                 </property>
@@ -84,25 +95,27 @@
         <property name="moduleService">
             <list merge="true">
                 <value>org.openmrs.module.bahmniemrapi.encountertransaction.service.BahmniEncounterTransactionService</value>
-                <ref local="bahmniEncounterTransactionService"/>
+                <ref bean="bahmniEncounterTransactionService"/>
             </list>
         </property>
     </bean>
 
-    <bean parent="serviceContext">
-        <property name="moduleService">
-            <list merge="true">
-                <value>org.bahmni.module.bahmnicore.service.BahmniObsService</value>
-                <ref bean="bahmniObsServiceImpl"/>
-            </list>
-        </property>
-    </bean>
+<!--    <bean parent="serviceContext">-->
+<!--        <property name="moduleService">-->
+<!--            <list merge="true">-->
+<!--                <value>org.bahmni.module.bahmnicore.service.BahmniObsService</value>-->
+<!--                <ref bean="bahmniObsServiceImpl"/>-->
+<!--            </list>-->
+<!--        </property>-->
+<!--    </bean>-->
 
     <bean id="bahmniEncounterTransactionService" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
         <property name="transactionManager">
             <ref bean="transactionManager"/>
         </property>
-        <property name="target"><ref local="bahmniEncounterTransactionServiceTarget"/></property>
+        <property name="target">
+            <ref bean="bahmniEncounterTransactionServiceTarget"/>
+        </property>
         <property name="preInterceptors">
             <ref bean="serviceInterceptors"/>
         </property>
@@ -127,6 +140,8 @@
         <constructor-arg ref="patientService" />
         <constructor-arg ref="locationService" />
         <constructor-arg ref="providerService" />
+        <constructor-arg ref="encounterSessionMatcher" />
+        <constructor-arg ref="bahmniVisitLocationService" />
         <constructor-arg ref="bahmniVisitAttributeService"/>
 
     </bean>
@@ -152,6 +167,103 @@
                         <ref bean="transactionAttributeSource" />
                     </property>
                 </bean>
+            </list>
+        </property>
+    </bean>
+
+    <bean parent="serviceContext">
+        <property name="moduleService">
+            <list merge="true">
+                <value>org.bahmni.module.bahmnicore.service.TsConceptSearchService</value>
+                <ref bean="tsConceptSearchService"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="tsConceptSearchService" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
+        <property name="transactionManager">
+            <ref bean="transactionManager"/>
+        </property>
+        <property name="target">
+            <ref bean="tsConceptSearchServiceTarget"/>
+        </property>
+        <property name="preInterceptors">
+            <ref bean="serviceInterceptors"/>
+        </property>
+        <property name="transactionAttributeSource">
+            <ref bean="transactionAttributeSource"/>
+        </property>
+    </bean>
+    <bean id="tsConceptSearchServiceTarget" class="org.bahmni.module.bahmnicore.service.impl.TsConceptSearchServiceImpl" autowire="constructor">
+        <constructor-arg  ref="bahmniDiagnosisService"/>
+        <constructor-arg  ref="emrConceptService"/>
+    </bean>
+
+    <bean parent="serviceContext">
+        <property name="moduleService">
+            <list merge="true">
+                <value>org.bahmni.module.bahmnicore.service.BahmniDiagnosisService</value>
+                <ref bean="bahmniDiagnosisService"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="bahmniDiagnosisService" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
+        <property name="transactionManager">
+            <ref bean="transactionManager"/>
+        </property>
+        <property name="target">
+            <ref bean="bahmniDiagnosisServiceTarget"/>
+        </property>
+        <property name="preInterceptors">
+            <ref bean="serviceInterceptors"/>
+        </property>
+        <property name="transactionAttributeSource">
+            <ref bean="transactionAttributeSource"/>
+        </property>
+    </bean>
+    <bean id="bahmniDiagnosisServiceTarget" class="org.bahmni.module.bahmnicore.service.impl.BahmniDiagnosisServiceImpl" autowire="constructor">
+        <constructor-arg  ref="encounterService"/>
+        <constructor-arg  ref="obsService"/>
+        <constructor-arg  ref="visitService"/>
+        <constructor-arg  ref="patientService"/>
+        <constructor-arg  ref="diagnosisMapper"/>
+        <constructor-arg  ref="bahmniDiagnosisMetadata"/>
+        <constructor-arg  ref="conceptService"/>
+        <constructor-arg  ref="emrApiProperties"/>
+        <constructor-arg  name="administrationService" ref="adminService"/>
+    </bean>
+    <bean id="noteDao" class="org.bahmni.module.bahmnicore.dao.impl.NoteDaoImpl">
+        <property name="sessionFactory">
+            <ref bean="sessionFactory"/>
+        </property>
+    </bean>
+
+    <bean id="noteService" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
+        <property name="transactionManager">
+            <ref bean="transactionManager"/>
+        </property>
+        <property name="target">
+            <bean class="org.bahmni.module.bahmnicore.service.impl.NoteServiceImpl">
+                <property name="noteDao">
+                    <ref bean="noteDao"/>
+                </property>
+            </bean>
+        </property>
+        <property name="preInterceptors">
+            <ref bean="serviceInterceptors"/>
+        </property>
+        <property name="transactionAttributeSource">
+            <ref bean="transactionAttributeSource"/>
+        </property>
+    </bean>
+
+
+    <bean parent="serviceContext">
+        <property name="moduleService">
+            <list merge="true">
+                <value>org.bahmni.module.bahmnicore.service.NoteService</value>
+                <ref bean="noteService"/>
             </list>
         </property>
     </bean>

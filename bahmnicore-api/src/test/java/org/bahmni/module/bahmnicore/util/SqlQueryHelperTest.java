@@ -6,7 +6,9 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.openmrs.api.AdministrationService;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.when;
@@ -63,5 +65,26 @@ public class SqlQueryHelperTest {
         String result = sqlQueryHelper.parseAdditionalParams(additionalParams, queryString);
 
         assertEquals(expectedQueryString,result);
+    }
+
+    @Test
+    public void shouldEscapeSQLInjection() {
+        assertEquals("0X3", SqlQueryHelper.escapeSQL("0x3", true, null));
+        assertEquals("DROP sampletable\\;--", SqlQueryHelper.escapeSQL("DROP sampletable;--", true, null));
+        assertEquals("admin\\'--", SqlQueryHelper.escapeSQL("admin'--", true, null));
+        assertEquals("admin\\'\\\\/*", SqlQueryHelper.escapeSQL("admin'/*", true, null));
+    }
+
+    @Test
+    public void shouldDetectSameParams(){
+        String queryString ="select * from location where name=${location_name} or location_id=${location_id} or location_id in (select l.location_id from location l where l.name=${location_name})";
+        String expectQueryString = "select * from location where name=? or location_id=? or location_id in (select l.location_id from location l where l.name=?)";
+        String result = sqlQueryHelper.transformIntoPreparedStatementFormat(queryString);
+        assertEquals(expectQueryString,result);
+        List<String> paramNamesFromPlaceHolders = sqlQueryHelper.getParamNamesFromPlaceHolders(queryString);
+        assertEquals(3, paramNamesFromPlaceHolders.size());
+        assertEquals("location_name", paramNamesFromPlaceHolders.get(0));
+        assertEquals("location_id", paramNamesFromPlaceHolders.get(1));
+        assertEquals("location_name", paramNamesFromPlaceHolders.get(2));
     }
 }

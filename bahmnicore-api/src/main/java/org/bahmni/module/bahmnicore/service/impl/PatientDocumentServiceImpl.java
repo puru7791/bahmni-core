@@ -2,6 +2,7 @@ package org.bahmni.module.bahmnicore.service.impl;
 
 import liquibase.util.file.FilenameUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.bahmni.module.bahmnicore.BahmniCoreException;
@@ -12,8 +13,6 @@ import org.bahmni.module.bahmnicore.properties.BahmniCoreProperties;
 import org.bahmni.module.bahmnicore.service.PatientDocumentService;
 import org.bahmni.module.bahmnicore.service.ThumbnailGenerator;
 import org.imgscalr.Scalr;
-import org.jcodec.common.model.Picture;
-import org.jcodec.scale.AWTUtil;
 import org.openmrs.module.webservices.rest.web.RestUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -24,9 +23,14 @@ import org.springframework.stereotype.Service;
 import javax.imageio.ImageIO;
 import javax.xml.bind.DatatypeConverter;
 import java.awt.image.BufferedImage;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,11 +38,14 @@ import java.util.UUID;
 @Lazy
 public class PatientDocumentServiceImpl implements PatientDocumentService {
     private static final String PDF = "pdf";
+    private static final String INVALID_FILE_SPECIFIED = "Invalid file specified";
+    private static final String FILE_NAME_PARAM_REQUIRED = "[Required String parameter 'filename' is empty]";
     private Log log = LogFactory.getLog(PatientDocumentServiceImpl.class);
     private static final String patientImagesFormat = "jpeg";
     private final Integer NO_OF_PATIENT_FILE_IN_A_DIRECTORY = 100;
     private final String VIDEO_FILE_TYPE = "video";
     private final String IMAGE_FILE_TYPE = "image";
+    private static final String LAB_RESULT_ENCOUNTER_TYPE = "LAB_RESULT";
 
     protected void setThumbnailGenerators(List<ThumbnailGenerator> thumbnailGenerators) {
         this.thumbnailGenerators = thumbnailGenerators;
@@ -62,12 +69,13 @@ public class PatientDocumentServiceImpl implements PatientDocumentService {
     }
 
     @Override
-    public String saveDocument(Integer patientId, String encounterTypeName, String content, String format, String fileType) {
+    public String saveDocument(Integer patientId, String encounterTypeName, String content, String format, String fileType, String fileName) {
+        String basePath;
         try {
             if (content == null || content.isEmpty()) return null;
+            basePath = getBasePathByEncounterType(encounterTypeName);
 
-            String basePath = getBasePath();
-            String relativeFilePath = createFilePath(basePath, patientId, encounterTypeName, format);
+            String relativeFilePath = createFilePath(basePath, patientId, encounterTypeName, format, fileName);
 
             File outputFile = new File(String.format("%s/%s", basePath, relativeFilePath));
             saveDocumentInFile(content, format, outputFile, fileType);
@@ -79,17 +87,30 @@ public class PatientDocumentServiceImpl implements PatientDocumentService {
         }
     }
 
+    private String getBasePathByEncounterType(String encounterTypeName) {
+        String basePath;
+        if(encounterTypeName.equalsIgnoreCase(LAB_RESULT_ENCOUNTER_TYPE)){
+            basePath = BahmniCoreProperties.getProperty("bahmnicore.documents.lablitebaseDirectory");
+        } else{
+            basePath = getBasePath();
+        }
+        return basePath;
+    }
+
     private String getBasePath() {
         return BahmniCoreProperties.getProperty("bahmnicore.documents.baseDirectory");
     }
 
-    private String createFileName(Integer patientId, String encounterTypeName, Object format) {
+    private String createFileName(Integer patientId, String encounterTypeName, Object format, String originalFileName) {
         String uuid = UUID.randomUUID().toString();
-        return String.format("%s-%s-%s.%s", patientId, encounterTypeName, uuid, format);
+        if (StringUtils.isNotBlank(originalFileName)) {
+            originalFileName = "__" + originalFileName;
+        }
+        return String.format("%s-%s-%s%s.%s", patientId, encounterTypeName, uuid, originalFileName, format);
     }
 
-    protected String createFilePath(String basePath, Integer patientId, String encounterTypeName, String format) {
-        String fileName = createFileName(patientId, encounterTypeName, format);
+    protected String createFilePath(String basePath, Integer patientId, String encounterTypeName, String format, String originalFileName) {
+        String fileName = createFileName(patientId, encounterTypeName, format, originalFileName);
         String documentDirectory = findDirectoryForDocumentsByPatientId(patientId);
         String absoluteFilePath = String.format("%s/%s", basePath, documentDirectory);
         File absoluteFileDirectory = new File(absoluteFilePath);
@@ -178,9 +199,27 @@ public class PatientDocumentServiceImpl implements PatientDocumentService {
 
     @Override
     public void delete(String fileName) {
+        validateFileToBeDeleted(fileName);
         File file = new File(getBasePath() + "/" + fileName);
         deleteThumbnailFile(file);
         deleteFile(file);
+    }
+
+    private void validateFileToBeDeleted(String fileName) {
+        log.debug(String.format("Patient document file to be deleted: %s",  fileName));
+        if (StringUtils.isBlank(fileName)) {
+            log.error(FILE_NAME_PARAM_REQUIRED);
+            throw new RuntimeException(FILE_NAME_PARAM_REQUIRED);
+        }
+        String docLocation = getBasePath();
+        log.debug(String.format("Document path: %s", docLocation));
+        Path docLocationPath = Paths.get(docLocation);
+        Path filePath = Paths.get(docLocation, fileName).normalize();
+        if (!filePath.startsWith(docLocationPath) || !filePath.toFile().exists()) {
+            String invalidFileError = String.format(INVALID_FILE_SPECIFIED.concat(": %s"), fileName);
+            log.error(invalidFileError);
+            throw new RuntimeException(invalidFileError);
+        }
     }
 
     private void deleteThumbnailFile(File file) {

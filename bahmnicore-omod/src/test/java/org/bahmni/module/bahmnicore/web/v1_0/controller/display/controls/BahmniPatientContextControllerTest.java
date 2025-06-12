@@ -1,6 +1,5 @@
 package org.bahmni.module.bahmnicore.web.v1_0.controller.display.controls;
 
-import org.bahmni.module.bahmnicore.model.bahmniPatientProgram.BahmniPatientProgram;
 import org.bahmni.module.bahmnicore.service.BahmniProgramWorkflowService;
 import org.bahmni.module.bahmnicore.web.v1_0.mapper.BahmniPatientContextMapper;
 import org.junit.Before;
@@ -10,11 +9,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.openmrs.Patient;
 import org.openmrs.PatientIdentifierType;
+import org.openmrs.PatientProgram;
 import org.openmrs.api.AdministrationService;
 import org.openmrs.api.PatientService;
 import org.openmrs.api.context.Context;
+import org.openmrs.api.context.UserContext;
 import org.openmrs.module.bahmniemrapi.patient.PatientContext;
 import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
@@ -27,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 
+@PowerMockIgnore("javax.management.*")
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(Context.class)
 public class BahmniPatientContextControllerTest {
@@ -46,6 +49,9 @@ public class BahmniPatientContextControllerTest {
     @Mock
     private BahmniPatientContextMapper bahmniPatientContextMapper;
 
+    @Mock
+    private UserContext userContext;
+
     @Before
     public void setUp() throws Exception {
         initMocks(this);
@@ -62,7 +68,7 @@ public class BahmniPatientContextControllerTest {
         List<String> configuredPersonAttributes = Collections.singletonList("Caste");
         List<String> configuredProgramAttributes = Collections.singletonList("IRDB Number");
         List<String> configuredPatientIdentifiers = Collections.singletonList("National Identifier");
-        BahmniPatientProgram bahmniPatientProgram = new BahmniPatientProgram();
+        PatientProgram bahmniPatientProgram = new PatientProgram();
         PatientIdentifierType primaryIdentifierType = new PatientIdentifierType();
 
         when(patientService.getPatientByUuid(patientUuid)).thenReturn(patient);

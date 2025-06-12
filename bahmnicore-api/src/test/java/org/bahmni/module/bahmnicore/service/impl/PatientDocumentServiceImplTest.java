@@ -7,6 +7,7 @@ import org.bahmni.module.bahmnicore.bahmniexceptions.VideoFormatNotSupportedExce
 import org.bahmni.module.bahmnicore.model.VideoFormats;
 import org.bahmni.module.bahmnicore.properties.BahmniCoreProperties;
 import org.bahmni.module.bahmnicore.service.ThumbnailGenerator;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -15,10 +16,13 @@ import org.junit.runner.RunWith;
 import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.openmrs.Patient;
+import org.openmrs.api.context.UserContext;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 import org.springframework.http.ResponseEntity;
+import org.openmrs.api.AdministrationService;
+import org.openmrs.api.context.Context;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -39,9 +43,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.powermock.api.mockito.PowerMockito.verifyStatic;
+import static org.mockito.MockitoAnnotations.initMocks;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({BahmniCoreProperties.class, FileInputStream.class, FileUtils.class, ImageIO.class})
+@PrepareForTest({BahmniCoreProperties.class, FileInputStream.class, FileUtils.class, ImageIO.class, Context.class})
 public class PatientDocumentServiceImplTest {
 
     private PatientDocumentServiceImpl patientDocumentService;
@@ -54,6 +59,18 @@ public class PatientDocumentServiceImplTest {
     @Mock
     ThumbnailGenerator thumbnailGenerator;
 
+    @Mock
+    private AdministrationService administrationService;
+
+    @Mock
+    private UserContext userContext;
+
+    @Before
+    public void setUp() {
+        initMocks(this);
+        PowerMockito.mockStatic(Context.class);
+        when(Context.getAdministrationService()).thenReturn(administrationService);
+    }
 
     @Test
     public void shouldCreateRightDirectoryAccordingToPatientId() {
@@ -62,7 +79,7 @@ public class PatientDocumentServiceImplTest {
 
         patientDocumentService = new PatientDocumentServiceImpl();
 
-        String url = patientDocumentService.createFilePath(".", 280, "Radiology", "jpeg");
+        String url = patientDocumentService.createFilePath(".", 280, "Radiology", "jpeg", "file-name");
 
         assertFalse(url.isEmpty());
         assertTrue(url.startsWith("300/280-Radiology-"));
@@ -101,7 +118,7 @@ public class PatientDocumentServiceImplTest {
                 "xyz", Arrays.toString(VideoFormats.values())));
 
         patientDocumentService = new PatientDocumentServiceImpl();
-        patientDocumentService.saveDocument(1, "Consultation", "videoContent", "xyz", "video");
+        patientDocumentService.saveDocument(1, "Consultation", "videoContent", "xyz", "video", "file-name");
     }
 
     @Test
@@ -115,7 +132,7 @@ public class PatientDocumentServiceImplTest {
         patient.setUuid("patient-uuid");
 
         patientDocumentService = new PatientDocumentServiceImpl();
-        String url = patientDocumentService.saveDocument(1, "Consultation", "pdfContent", "pdf", "file");
+        String url = patientDocumentService.saveDocument(1, "Consultation", "pdfContent", "pdf", "file", "file-name");
 
         assertTrue(url.matches(".*1-Consultation-.*.pdf"));
     }
@@ -134,7 +151,7 @@ public class PatientDocumentServiceImplTest {
         patient.setUuid("patient-uuid");
 
         patientDocumentService = new PatientDocumentServiceImpl();
-        String url = patientDocumentService.saveDocument(1, "Consultation", "imageContent", "jpg", "image");
+        String url = patientDocumentService.saveDocument(1, "Consultation", "imageContent", "jpg", "image", "file-name");
 
         assertTrue(url.matches(".*1-Consultation-.*.jpg"));
     }
@@ -153,7 +170,7 @@ public class PatientDocumentServiceImplTest {
         expectedException.expectMessage("The file type is not supported. Supported types are image/video/pdf");
 
         patientDocumentService = new PatientDocumentServiceImpl();
-        patientDocumentService.saveDocument(1, "Consultation", "otherfileContent", "xyz", "csv");
+        patientDocumentService.saveDocument(1, "Consultation", "otherfileContent", "xyz", "csv", "file-name");
     }
 
     @Test
@@ -174,9 +191,9 @@ public class PatientDocumentServiceImplTest {
         expectedException.expectMessage("The image format 'bmp' is not supported. Supported formats are [png, jpeg, gif]");
 
         patientDocumentService = new PatientDocumentServiceImpl();
-        patientDocumentService.saveDocument(1, "Consultation", "otherfileContent", "bmp", "image");
+        patientDocumentService.saveDocument(1, "Consultation", "otherfileContent", "bmp", "image", "file-name");
     }
-    
+
     @Test
     public void shouldCreateThumbnailForVideo() throws Exception {
         PowerMockito.mockStatic(BahmniCoreProperties.class);
@@ -195,7 +212,7 @@ public class PatientDocumentServiceImplTest {
         patientDocumentService.setThumbnailGenerators(thumbnailGenerators);
         when(thumbnailGenerator.isFormatSupported("mov")).thenReturn(true);
         when(thumbnailGenerator.generateThumbnail(any(File.class))).thenReturn(new BufferedImage(20,20, 1));
-        patientDocumentService.saveDocument(1, "Consultation", content, "mov", "video");
+        patientDocumentService.saveDocument(1, "Consultation", content, "mov", "video", "file-name");
         verify(thumbnailGenerator,times(1)).isFormatSupported("mov");
         verify(thumbnailGenerator,times(1)).generateThumbnail(any(File.class));
     }
@@ -218,7 +235,7 @@ public class PatientDocumentServiceImplTest {
         patientDocumentService.setThumbnailGenerators(thumbnailGenerators);
         when(thumbnailGenerator.isFormatSupported("mkv")).thenReturn(false);
         when(thumbnailGenerator.generateThumbnail(any(File.class))).thenReturn(new BufferedImage(20,20, 1));
-        patientDocumentService.saveDocument(1, "Consultation", content, "mkv", "video");
+        patientDocumentService.saveDocument(1, "Consultation", content, "mkv", "video", "file-name");
         verify(thumbnailGenerator,times(1)).isFormatSupported("mkv");
         verify(thumbnailGenerator,times(0)).generateThumbnail(any(File.class));
     }

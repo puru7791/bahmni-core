@@ -16,6 +16,7 @@ public class BahmniDrugOrder implements Comparable<BahmniDrugOrder>{
     private EncounterTransaction.Provider provider;
     private List<BahmniOrderAttribute> orderAttributes;
     private boolean retired;
+    private String encounterUuid;
 
     private String creatorName;
 
@@ -123,6 +124,10 @@ public class BahmniDrugOrder implements Comparable<BahmniDrugOrder>{
         this.drugOrder = drugOrder;
     }
 
+    public EncounterTransaction.DrugOrder getDrugOrder() {
+        return this.drugOrder;
+    }
+
     public void setProvider(EncounterTransaction.Provider provider) {
         this.provider = provider;
     }
@@ -188,5 +193,13 @@ public class BahmniDrugOrder implements Comparable<BahmniDrugOrder>{
 
     public void setRetired(boolean retired) {
         this.retired = retired;
+    }
+
+    public String getEncounterUuid() {
+        return this.encounterUuid;
+    }
+
+    public void setEncounterUuid(String encounterUuid) {
+        this.encounterUuid = encounterUuid;
     }
 }

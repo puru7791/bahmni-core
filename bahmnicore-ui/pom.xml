@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.bahmni.module</groupId>
         <artifactId>bahmni</artifactId>
-        <version>0.93-SNAPSHOT</version>
+        <version>1.3.0-SNAPSHOT</version>
     </parent>
     <artifactId>bahmnicore-ui</artifactId>
     <packaging>jar</packaging>
@@ -30,6 +30,8 @@
         <dependency>
             <groupId>org.openmrs.api</groupId>
             <artifactId>openmrs-api</artifactId>
+            <version>${openMRSVersion}</version>
+            <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -76,16 +78,9 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.openmrs.api</groupId>
-            <artifactId>openmrs-api</artifactId>
-            <version>${openMRSVersion}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openmrs.api</groupId>
-            <artifactId>openmrs-api</artifactId>
-            <version>${openMRSVersion}</version>
-            <type>test-jar</type>
-            <scope>test</scope>
+            <groupId>org.openmrs.module</groupId>
+            <artifactId>emrapi-api-2.2</artifactId>
+            <version>${emrapi-omod.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openmrs.module</groupId>
@@ -126,7 +121,7 @@
             <version>${addressHierarchyVersion}</version>
         </dependency>
         <dependency>
-            <groupId>org.openmrs.module</groupId>
+            <groupId>org.bahmni.module</groupId>
             <artifactId>episodes-api</artifactId>
             <version>${episodes.version}</version>
             <scope>provided</scope>
@@ -134,7 +129,7 @@
         <dependency>
             <groupId>org.ict4h.openmrs</groupId>
             <artifactId>openmrs-atomfeed-api</artifactId>
-            <version>2.5.3</version>
+            <version>${openmrsAtomfeedVersion}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -147,7 +142,14 @@
             <version>${metadatamapping.version}</version>
             <scope>test</scope>
         </dependency>
-
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

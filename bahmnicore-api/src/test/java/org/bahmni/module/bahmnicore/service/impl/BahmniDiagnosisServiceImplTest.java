@@ -9,7 +9,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
-import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.openmrs.Concept;
@@ -18,6 +17,7 @@ import org.openmrs.Obs;
 import org.openmrs.Patient;
 import org.openmrs.Person;
 import org.openmrs.Visit;
+import org.openmrs.api.AdministrationService;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.EncounterService;
 import org.openmrs.api.ObsService;
@@ -28,11 +28,10 @@ import org.openmrs.module.bahmniemrapi.diagnosis.contract.BahmniDiagnosisRequest
 import org.openmrs.module.bahmniemrapi.diagnosis.helper.BahmniDiagnosisMetadata;
 import org.openmrs.module.emrapi.EmrApiProperties;
 import org.openmrs.module.emrapi.diagnosis.Diagnosis;
-import org.openmrs.module.emrapi.diagnosis.DiagnosisService;
 import org.openmrs.module.emrapi.encounter.DiagnosisMapper;
-import org.openmrs.module.emrapi.encounter.domain.EncounterTransaction;
 import org.openmrs.util.LocaleUtility;
 import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
@@ -45,17 +44,17 @@ import java.util.Locale;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.anyListOf;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@PowerMockIgnore("javax.management.*")
 @PrepareForTest(LocaleUtility.class)
 @RunWith(PowerMockRunner.class)
 public class BahmniDiagnosisServiceImplTest {
@@ -74,12 +73,13 @@ public class BahmniDiagnosisServiceImplTest {
     @Mock
     private DiagnosisMapper diagnosisMapper;
     @Mock
-    private DiagnosisService diagnosisService;
-    @Mock
     private EmrApiProperties emrApiProperties;
 
+    @Mock
+    private AdministrationService administrationService;
+
     @InjectMocks
-    private BahmniDiagnosisServiceImpl bahmniDiagnosisService = new BahmniDiagnosisServiceImpl(encounterService, obsService, visitService, patientService, diagnosisMapper, diagnosisService, bahmniDiagnosisMetadata, conceptService, emrApiProperties);
+    private BahmniDiagnosisServiceImpl bahmniDiagnosisService = new BahmniDiagnosisServiceImpl(encounterService, obsService, visitService, patientService, diagnosisMapper, bahmniDiagnosisMetadata, conceptService, emrApiProperties, administrationService);
 
     private String initialDiagnosisObsUUID = "initialDiagnosisObsUUID";
     private String modifiedDiagnosisObsUUID = "modifiedDiagnosisObsUUID";
@@ -95,6 +95,7 @@ public class BahmniDiagnosisServiceImplTest {
 
         PowerMockito.mockStatic(LocaleUtility.class);
         PowerMockito.when(LocaleUtility.getLocalesInOrder()).thenReturn(new HashSet<>(Arrays.asList(Locale.getDefault())));
+        when(administrationService.getGlobalProperty(eq("bahmni.lookupExternalTerminologyServer"))).thenReturn("false");
     }
 
     @Test
@@ -190,14 +191,14 @@ public class BahmniDiagnosisServiceImplTest {
         when(visitService.getVisitByUuid("visitId")).thenReturn(visit);
         when(patientService.getPatientByUuid("patientId")).thenReturn(patient);
         when(bahmniDiagnosisMetadata.getDiagnosisSetConcept()).thenReturn(diagnosisSetConcept);
-        when(obsService.getObservations(eq(Arrays.asList((Person) patient)), eq(new ArrayList<>(visit.getEncounters())), eq(Arrays.asList(diagnosisSetConcept)), anyListOf(Concept.class), anyList(), anyList(), anyList(),
-                anyInt(), anyInt(), Matchers.any(Date.class), Matchers.any(Date.class), eq(false)))
+        when(obsService.getObservations(eq(Arrays.asList((Person) patient)), eq(new ArrayList<>(visit.getEncounters())), eq(Arrays.asList(diagnosisSetConcept)), eq(null), eq(null), eq(null), anyList(),
+                eq(null), eq(null), eq(null), eq(null), eq(false)))
                 .thenReturn(Arrays.asList(diagnosis.getExistingObs()));
         when(bahmniDiagnosisMetadata.buildDiagnosisFromObsGroup(diagnosis.getExistingObs(), new ArrayList<Concept>(), new ArrayList<Concept>())).thenReturn(diagnosis);
         when(diagnosisMapper.convert(any(Diagnosis.class))).thenReturn(null);
         when(bahmniDiagnosisMetadata.findInitialDiagnosisUuid(diagnosis.getExistingObs())).thenReturn("firstDiagnosisObsId");
         when(bahmniDiagnosisMetadata.findInitialDiagnosis(updatedDiagnosis.getExistingObs())).thenReturn(diagnosis.getExistingObs());
-        when(bahmniDiagnosisMetadata.mapBahmniDiagnosis(any(EncounterTransaction.Diagnosis.class), any(EncounterTransaction.Diagnosis.class), eq(true), eq(false), eq(false), eq(true))).thenReturn(bahmniDiagnosisRequest);
+        when(bahmniDiagnosisMetadata.mapBahmniDiagnosis(eq(null), eq(null), eq(true), eq(false), eq(false), eq(true))).thenReturn(bahmniDiagnosisRequest);
 
         List<BahmniDiagnosisRequest> bahmniDiagnosisRequests = bahmniDiagnosisService.getBahmniDiagnosisByPatientAndVisit("patientId", "visitId");
 
@@ -226,6 +227,25 @@ public class BahmniDiagnosisServiceImplTest {
         List<BahmniDiagnosisRequest> bahmniDiagnosisRequests = bahmniDiagnosisService.getBahmniDiagnosisByPatientAndVisit("patientId", visitId);
 
         assertEquals(0, bahmniDiagnosisRequests.size());
+    }
+
+    @Test
+    public void shouldReturnFalseWhenNoExternalTerminologyServerLookupNeeded() {
+        boolean externalTerminologyServerLookupNeeded = bahmniDiagnosisService.isExternalTerminologyServerLookupNeeded();
+        assertFalse(externalTerminologyServerLookupNeeded);
+    }
+
+    @Test
+    public void shouldReturnTrueWhenExternalTerminologyServerLookupNeeded() {
+        when(administrationService.getGlobalProperty(eq("bahmni.lookupExternalTerminologyServer"))).thenReturn("TRUE");
+        boolean externalTerminologyServerLookupNeeded = bahmniDiagnosisService.isExternalTerminologyServerLookupNeeded();
+        assertTrue(externalTerminologyServerLookupNeeded);
+    }
+
+    @Test
+    public void shouldCallDiagosisSetofSetsInEmrApiWhenNoExternalTerminologyServerLookupNeeded() {
+        bahmniDiagnosisService.getDiagnosisSets();
+        verify(emrApiProperties, times(1)).getDiagnosisSets();
     }
 
     private Diagnosis getDiagnosis() {

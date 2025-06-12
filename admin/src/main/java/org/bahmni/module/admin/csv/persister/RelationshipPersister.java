@@ -1,13 +1,14 @@
 package org.bahmni.module.admin.csv.persister;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bahmni.csv.EntityPersister;
 import org.bahmni.csv.Messages;
 import org.bahmni.module.admin.csv.models.RelationshipRow;
 import org.bahmni.module.admin.csv.service.CSVRelationshipService;
 import org.bahmni.module.admin.csv.utils.CSVUtils;
-import org.bahmni.module.bahmnicore.service.BahmniPatientService;
+import org.bahmni.module.bahmnicommons.api.service.BahmniPatientService;
 import org.openmrs.api.AdministrationService;
 import org.openmrs.api.PersonService;
 import org.openmrs.api.ProviderService;
@@ -35,7 +36,7 @@ public class RelationshipPersister implements EntityPersister<RelationshipRow> {
     @Qualifier("adminService")
     private AdministrationService administrationService;
 
-    private static final Logger log = Logger.getLogger(RelationshipPersister.class);
+    private static final Logger log = LogManager.getLogger(RelationshipPersister.class);
     private UserContext userContext;
 
     public void init(UserContext userContext) {

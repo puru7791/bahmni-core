@@ -6,15 +6,19 @@ import org.openmrs.Obs;
 import org.openmrs.Order;
 import org.openmrs.Patient;
 import org.openmrs.Provider;
+import org.openmrs.TestOrder;
 import org.openmrs.Visit;
 import org.openmrs.api.EncounterService;
+import org.openmrs.api.db.hibernate.HibernateUtil;
 import org.openmrs.module.bahmniemrapi.accessionnote.contract.AccessionNote;
 import org.openmrs.module.bahmniemrapi.laborder.contract.LabOrderResult;
 import org.openmrs.module.bahmniemrapi.laborder.contract.LabOrderResults;
 import org.openmrs.module.emrapi.encounter.EncounterTransactionMapper;
+import org.openmrs.module.emrapi.encounter.OrderMapper;
 import org.openmrs.module.emrapi.encounter.domain.EncounterTransaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,8 +45,12 @@ public class LabOrderResultsServiceImpl implements LabOrderResultsService {
 
     @Autowired
     private EncounterService encounterService;
+    
+    @Autowired
+    private OrderMapper orderMapper;
 
     @Override
+    @Transactional(readOnly = true)
     public LabOrderResults getAll(Patient patient, List<Visit> visits, int numberOfAccessions) {
         List<EncounterTransaction.Order> testOrders = new ArrayList<>();
         List<EncounterTransaction.Observation> observations = new ArrayList<>();
@@ -170,6 +178,18 @@ public class LabOrderResultsServiceImpl implements LabOrderResultsService {
                 orders.add(order);
             }
         }
+        // Hack to handle OpenMRS Test Orders from the TestOrder domain as Orders since the EMRAPI's OrderMapper does not handle them
+        if (orders.isEmpty()) {
+            for (Order order : encounter.getOrders()) {
+                order = HibernateUtil.getRealObjectFromProxy(order);
+                boolean conceptFilter = (concepts == null) || concepts.contains(order.getConcept().getName().getName());
+                if (TestOrder.class.equals(order.getClass()) && ((conceptFilter && LAB_ORDER_TYPE.equals(order.getOrderType().getName())) && !((startDate != null && order.getDateCreated().before(startDate))
+                        || (endDate != null && order.getDateCreated().after(endDate))))) {
+                	encounterTestOrderUuidMap.put(order.getUuid(), encounter);
+                	orders.add(orderMapper.mapOrder(order));
+                }
+            }
+        }
         return orders;
     }
 
@@ -205,6 +225,9 @@ public class LabOrderResultsServiceImpl implements LabOrderResultsService {
                 EncounterTransaction.Concept orderConcept = testOrder.getConcept();
                 Encounter orderEncounter = encounterTestOrderMap.get(testOrder.getUuid());
                 LabOrderResult labOrderResult = new LabOrderResult(testOrder.getUuid(), testOrder.getAction(), orderEncounter.getUuid(), orderEncounter.getEncounterDatetime(), orderConcept.getName(), orderConcept.getUnits(), null, null, null, null, false, null, null);
+                if(testOrder.getConcept().getShortName() != null) {
+                    labOrderResult.setPreferredTestName(testOrder.getConcept().getShortName());
+                }
                 labOrderResult.setVisitStartTime(orderEncounter.getVisit().getStartDatetime());
                 labOrderResults.add(labOrderResult);
             }
@@ -218,7 +241,11 @@ public class LabOrderResultsServiceImpl implements LabOrderResultsService {
             for (EncounterTransaction.Observation observation : obsGroup.getGroupMembers()) {
                 LabOrderResult order = createLabOrderResult(observation, testOrder, encounterTestOrderMap, encounterObservationMap, encounterToAccessionNotesMap);
                 order.setPanelUuid(obsGroup.getConceptUuid());
-                order.setPanelName(obsGroup.getConcept().getName());
+                if(obsGroup.getConcept().getShortName() != null) {
+                    order.setPanelName(obsGroup.getConcept().getShortName());
+                }else{
+                    order.setPanelName(obsGroup.getConcept().getName());
+                }
                 labOrderResults.add(order);
             }
         } else {
@@ -255,6 +282,11 @@ public class LabOrderResultsServiceImpl implements LabOrderResultsService {
         labOrderResult.setAccessionNotes(encounterToAccessionNotesMap.get(orderEncounter.getUuid()));
         labOrderResult.setAction(testOrder.getAction());
         labOrderResult.setOrderUuid(testOrder.getUuid());
+        if(observation.getConcept().getShortName() != null) {
+            labOrderResult.setPreferredTestName(observation.getConcept().getShortName());
+        }else{
+            labOrderResult.setTestName(observation.getConcept().getName());
+        }
         return labOrderResult;
     }
 

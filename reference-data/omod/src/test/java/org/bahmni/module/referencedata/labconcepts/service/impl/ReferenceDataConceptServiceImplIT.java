@@ -160,8 +160,6 @@ public class ReferenceDataConceptServiceImplIT extends BaseIntegrationTest {
         assertEquals(ConceptDatatype.N_A_UUID, concept.getDatatype().getUuid());
     }
 
-
-
     @Test
     public void updateExistingConceptSetWithUUID() throws Exception {
         ConceptSet conceptSet = new ConceptSet();

@@ -27,9 +27,7 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -104,7 +102,7 @@ public class BahmniObsServiceImplTest {
         Integer numberOfVisits = 3;
         bahmniObsService.observationsFor(personUUID, asList(bloodPressureConcept), numberOfVisits, null, false, null, null, null);
         verify(obsDao).getObsByPatientAndVisit(personUUID, asList("Blood Pressure"),
-                visitDao.getVisitIdsFor(personUUID, numberOfVisits), -1, ObsDaoImpl.OrderBy.DESC, null, false, null, null, null);
+                visitDao.getVisitIdsFor(personUUID, numberOfVisits), Integer.MAX_VALUE, ObsDaoImpl.OrderBy.DESC, null, false, null, null, null);
     }
 
     @Test
@@ -216,12 +214,12 @@ public class BahmniObsServiceImplTest {
         Obs obs = new Obs();
         BahmniObservation expectedBahmniObservation = new BahmniObservation();
         when(obsService.getObsByUuid(observationUuid)).thenReturn(obs);
-        when(omrsObsToBahmniObsMapper.map(obs)).thenReturn(expectedBahmniObservation);
+        when(omrsObsToBahmniObsMapper.map(obs, null)).thenReturn(expectedBahmniObservation);
 
         BahmniObservation actualBahmniObservation = bahmniObsService.getBahmniObservationByUuid(observationUuid);
 
         verify(obsService, times(1)).getObsByUuid(observationUuid);
-        verify(omrsObsToBahmniObsMapper, times(1)).map(obs);
+        verify(omrsObsToBahmniObsMapper, times(1)).map(obs, null);
         assertNotNull(actualBahmniObservation);
         assertEquals(expectedBahmniObservation, actualBahmniObservation);
     }
@@ -264,7 +262,7 @@ public class BahmniObsServiceImplTest {
         when(visitDao.getVisitIdsFor(patientUuid, numberOfVisits)).thenReturn(visitIds);
         when(obsDao.getObsForFormBuilderForms(patientUuid, formNames, visitIds, encounters, null, null))
                 .thenReturn(singletonList(observation));
-        when(omrsObsToBahmniObsMapper.map(observation)).thenReturn(bahmniObservation);
+        when(omrsObsToBahmniObsMapper.map(observation, null)).thenReturn(bahmniObservation);
 
         Collection<BahmniObservation> bahmniObservations = bahmniObsService.getObsForFormBuilderForms(patientUuid,
                 formNames, numberOfVisits, null, null, patientProgramUuid);

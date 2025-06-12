@@ -1,5 +1,6 @@
 package org.bahmni.module.elisatomfeedclient.api.mapper;
 
+import org.bahmni.module.elisatomfeedclient.api.Constants;
 import org.bahmni.module.elisatomfeedclient.api.ElisAtomFeedProperties;
 import org.bahmni.module.elisatomfeedclient.api.builder.OpenElisAccessionBuilder;
 import org.bahmni.module.elisatomfeedclient.api.builder.OpenElisTestDetailBuilder;
@@ -23,6 +24,7 @@ import org.openmrs.Provider;
 import org.openmrs.User;
 import org.openmrs.Visit;
 import org.openmrs.VisitType;
+import org.openmrs.api.AdministrationService;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.EncounterService;
 import org.openmrs.api.LocationService;
@@ -32,7 +34,7 @@ import org.openmrs.api.ProviderService;
 import org.openmrs.api.UserService;
 import org.openmrs.api.VisitService;
 import org.openmrs.api.context.Context;
-import org.openmrs.module.bahmniemrapi.visitlocation.BahmniVisitLocationService;
+import org.bahmni.module.bahmnicommons.api.visitlocation.BahmniVisitLocationService;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
@@ -49,6 +51,7 @@ import java.util.Set;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyCollection;
@@ -85,6 +88,8 @@ public class AccessionHelperTest {
     private OrderService orderService;
     @Mock
     private LocationService locationService;
+    @Mock
+    private AdministrationService administrationService;
 
     private AccessionHelper accessionHelper;
     private static final String VISIT_START_DATE = "2014-01-15 15:25:43+0530";
@@ -96,7 +101,7 @@ public class AccessionHelperTest {
     @Before
     public void setUp() {
         initMocks(this);
-        accessionHelper = new AccessionHelper(encounterService, patientService, visitService, conceptService, userService, providerService, orderService, feedProperties,bahmniVisitLocationService);
+        accessionHelper = new AccessionHelper(encounterService, patientService, visitService, conceptService, userService, providerService, orderService, feedProperties,bahmniVisitLocationService, administrationService);
         simpleDateFormat = new SimpleDateFormat(DATE_FORMAT);
     }
 
@@ -121,7 +126,7 @@ public class AccessionHelperTest {
         when(visitService.getVisitTypes("LAB_RESULTS")).thenReturn(Arrays.asList(visits.get(0).getVisitType()));
         when(visitService.getVisits(anyCollection(), anyCollection(), anyCollection(), anyCollection(), any(Date.class), any(Date.class), any(Date.class), any(Date.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(visits);
         when(userService.getUserByUsername(anyString())).thenReturn(provider);
-        when(providerService.getProvidersByPerson(any(Person.class))).thenReturn(Arrays.asList(new Provider()));
+        when(providerService.getProvidersByPerson(eq(null))).thenReturn(Arrays.asList(new Provider()));
         when(encounterService.getEncounterRoleByUuid(EncounterRole.UNKNOWN_ENCOUNTER_ROLE_UUID)).thenReturn(new EncounterRole());
         when(orderService.getOrderTypes(true)).thenReturn(Arrays.asList(getOrderType()));
         PowerMockito.mockStatic(Context.class);
@@ -160,7 +165,7 @@ public class AccessionHelperTest {
         when(visitService.getVisitTypes("LAB_RESULTS")).thenReturn(Arrays.asList(visits.get(0).getVisitType()));
         when(visitService.getVisits(anyCollection(), anyCollection(), anyCollection(), anyCollection(), any(Date.class), any(Date.class), any(Date.class), any(Date.class), anyMap(), anyBoolean(), anyBoolean())).thenReturn(visits);
         when(userService.getUserByUsername(anyString())).thenReturn(provider);
-        when(providerService.getProvidersByPerson(any(Person.class))).thenReturn(Arrays.asList(new Provider()));
+        when(providerService.getProvidersByPerson(eq(null))).thenReturn(Arrays.asList(new Provider()));
         when(encounterService.getEncounterRoleByUuid(EncounterRole.UNKNOWN_ENCOUNTER_ROLE_UUID)).thenReturn(new EncounterRole());
         when(orderService.getOrderTypes(true)).thenReturn(Arrays.asList(getOrderType()));
         when(visitService.saveVisit(any(Visit.class))).thenReturn(visits.get(0));
@@ -194,8 +199,8 @@ public class AccessionHelperTest {
         orders.add(test);
         previousEncounter.setOrders(orders);
         when(userService.getUserByUsername(anyString())).thenReturn(new User());
-        when(providerService.getProvidersByPerson(any(Person.class))).thenReturn(Arrays.asList(new Provider()));
-
+        when(providerService.getProvidersByPerson(eq(null))).thenReturn(Arrays.asList(new Provider()));
+        when(administrationService.getGlobalPropertyValue(Constants.GP_ALLOW_DISCONTINUE_ORDERS, Boolean.TRUE)).thenReturn(Boolean.TRUE);
         AccessionDiff diff = new AccessionDiff();
         diff.addAddedTestDetail(new OpenElisTestDetailBuilder().withTestUuid("test2").build());
         diff.addAddedTestDetail(new OpenElisTestDetailBuilder().withTestUuid("panel1").build());
@@ -217,6 +222,7 @@ public class AccessionHelperTest {
 
         AccessionDiff diff = new AccessionDiff();
         diff.addRemovedTestDetails(new OpenElisTestDetailBuilder().withTestUuid("test2").withStatus("Cancelled").build());
+        when(administrationService.getGlobalPropertyValue(Constants.GP_ALLOW_DISCONTINUE_ORDERS, Boolean.TRUE)).thenReturn(Boolean.TRUE);
 
         Encounter encounter = accessionHelper.addOrDiscontinueOrderDifferences(new OpenElisAccessionBuilder().build(), diff, previousEncounter);
 
@@ -226,6 +232,29 @@ public class AccessionHelperTest {
             if (order.getAction().equals(Order.Action.DISCONTINUE)) {
                 Assert.assertTrue(order.getPreviousOrder().getConcept().getUuid().endsWith(order.getConcept().getUuid()));
             }
+        }
+    }
+
+    @Test
+    public void shouldNotMapDeletedOrdersToExistingEncounter() {
+        Encounter previousEncounter = new Encounter();
+        Order panel = getOrderWithConceptUuid("panel2");
+        Order test = getOrderWithConceptUuid("test3");
+        HashSet<Order> orders = new HashSet<>();
+        orders.add(panel);
+        orders.add(test);
+        previousEncounter.setOrders(orders);
+
+        AccessionDiff diff = new AccessionDiff();
+        diff.addRemovedTestDetails(new OpenElisTestDetailBuilder().withTestUuid("test3").withStatus("Cancelled").build());
+        when(administrationService.getGlobalPropertyValue(Constants.GP_ALLOW_DISCONTINUE_ORDERS, Boolean.TRUE)).thenReturn(Boolean.FALSE);
+
+        Encounter encounter = accessionHelper.addOrDiscontinueOrderDifferences(new OpenElisAccessionBuilder().build(), diff, previousEncounter);
+
+        Set<Order> result = encounter.getOrders();
+        Assert.assertEquals(2, result.size());
+        for (Order order : result) {
+            Assert.assertEquals(order.getAction(), Order.Action.NEW);
         }
     }
 

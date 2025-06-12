@@ -18,7 +18,6 @@ import org.openmrs.api.PersonService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniObservation;
 import org.openmrs.module.bahmniemrapi.encountertransaction.mapper.OMRSObsToBahmniObsMapper;
-import org.openmrs.module.emrapi.encounter.OrderMapper;
 import org.openmrs.module.emrapi.encounter.domain.EncounterTransaction;
 import org.openmrs.module.emrapi.encounter.mapper.OrderMapper1_12;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,14 +52,13 @@ public class BahmniBridge {
     private OMRSObsToBahmniObsMapper omrsObsToBahmniObsMapper;
     private BahmniConceptService bahmniConceptService;
 
-    private OrderMapper drugOrderMapper = new OrderMapper1_12();
+    private OrderMapper1_12 drugOrderMapper = new OrderMapper1_12();
     /**
      * Factory method to construct objects of <code>BahmniBridge</code>.
-     * <p/>
      * This is provided so that <code>BahmniBridge</code> can be called by extensions without having to use the
      * Spring application context. Prefer using this as opposed to the constructor.
      *
-     * @return
+     * @return instance of BahmniBridge registered with OpenMRS Context
      */
     public static BahmniBridge create() {
         return Context.getRegisteredComponents(BahmniBridge.class).iterator().next();
@@ -80,11 +78,10 @@ public class BahmniBridge {
 
     /**
      * Set patient uuid. This will be used by methods that require the patient to perform its operations.
-     * <p/>
      * Setting patient uuid might be mandatory depending on the operation you intend to perform using the bridge.
      *
-     * @param patientUuid
-     * @return
+     * @param patientUuid uuid of the patient
+     * @return reference to the instance
      */
     public BahmniBridge forPatient(String patientUuid) {
         this.patientUuid = patientUuid;
@@ -93,11 +90,10 @@ public class BahmniBridge {
 
     /**
      * Set patient program uuid. This will be used by methods that require the patient to perform its operations associated with a specific program.
-     * <p/>
      * Setting patient program uuid might be mandatory depending on the operation you intend to perform using the bridge.
      *
-     * @param patientProgramUuid
-     * @return
+     * @param patientProgramUuid patient's program uuid
+     * @return reference to the instance
      */
     public BahmniBridge forPatientProgram(String patientProgramUuid) {
         this.patientProgramUuid = patientProgramUuid;
@@ -106,11 +102,10 @@ public class BahmniBridge {
 
     /**
      * Set visit uuid. This will be used by methods that require a visit to perform its operations.
-     * <p/>
      * Setting visit uuid might be mandatory depending on the operation you intend to perform using the bridge.
      *
-     * @param visitUuid
-     * @return
+     * @param visitUuid visit uuid
+     * @return reference to the instance
      */
     public BahmniBridge forVisit(String visitUuid) {
         this.visitUUid = visitUuid;
@@ -121,8 +116,8 @@ public class BahmniBridge {
      * Retrieve last observation for <code>patientUuid</code> set using {@link org.bahmni.module.bahmnicore.service.impl.BahmniBridge#forPatient(String)}
      * for the given <code>conceptName</code>.
      *
-     * @param conceptName
-     * @return
+     * @param conceptName concept name FSN in preferred language
+     * @return latest obs captured for the concept
      */
     public Obs latestObs(String conceptName) {
         List<Obs> obsList;
@@ -142,8 +137,8 @@ public class BahmniBridge {
     /**
      * Retrieve age in years for <code>patientUuid</code> set using {@link org.bahmni.module.bahmnicore.service.impl.BahmniBridge#forPatient(String)}
      *
-     * @param asOfDate
-     * @return
+     * @param asOfDate date as of today
+     * @return age in years
      */
     public Integer ageInYears(Date asOfDate) {
         Date birthdate = patientService.getPatientByUuid(patientUuid).getBirthdate();
@@ -154,17 +149,17 @@ public class BahmniBridge {
     /**
      * Retrieve drug orders set for <code>regimenName</code>
      *
-     * @param regimenName
-     * @return
+     * @param regimenName drug regimen name
+     * @return list of DrugOrder
      */
     public Collection<EncounterTransaction.DrugOrder> drugOrdersForRegimen(String regimenName) {
         return orderDao.getDrugOrderForRegimen(regimenName);
     }
 
     /**
-     * Retrieve active Drug orders for <code>patientUuid<code/>
+     * Retrieve active Drug orders for patientUuid
      *
-     * @return
+     * @return List of Drug Order
      */
     public List<EncounterTransaction.DrugOrder> activeDrugOrdersForPatient() {
         List<DrugOrder> activeOpenMRSDrugOrders = bahmniDrugOrderService.getActiveDrugOrders(patientUuid);
@@ -180,8 +175,8 @@ public class BahmniBridge {
 
     /**
      * Retrieve person attribute type for <code>attributeType</code>
-     *
-     * @return
+     * @param attributeType name of the attribute
+     * @return patient attribute def
      */
     public PersonAttributeType getPersonAttributeType(String attributeType) {
         return personService.getPersonAttributeTypeByName(attributeType);
@@ -190,7 +185,7 @@ public class BahmniBridge {
     /**
      * Retrieve concept for <code>conceptName</code>
      *
-     * @return
+     * @return concept identified by name
      */
     public Concept getConcept(String conceptName) {
         return conceptService.getConceptByName(conceptName);
@@ -219,7 +214,7 @@ public class BahmniBridge {
     /**
      * Retrieve concept for <code>conceptName</code>
      *
-     * @return
+     * @return start date of treatment
      */
     public Date getStartDateOfTreatment() throws ParseException {
         List<Order> allDrugOrders = bahmniDrugOrderService.getAllDrugOrders(patientUuid, null, null, null, null);
@@ -244,13 +239,13 @@ public class BahmniBridge {
 
     public BahmniObservation getChildObsFromParentObs(String parentObsGroupUuid, String childConceptName){
         Concept childConcept = conceptService.getConceptByName(childConceptName);
-        return omrsObsToBahmniObsMapper.map(obsDao.getChildObsFromParent(parentObsGroupUuid, childConcept));
+        return omrsObsToBahmniObsMapper.map(obsDao.getChildObsFromParent(parentObsGroupUuid, childConcept), null);
     }
 
     public BahmniObservation getLatestBahmniObservationFor(String conceptName){
         Obs obs = latestObs(conceptName);
         if(obs != null) {
-            return omrsObsToBahmniObsMapper.map(obs);
+            return omrsObsToBahmniObsMapper.map(obs, null);
         }
         return null;
     }

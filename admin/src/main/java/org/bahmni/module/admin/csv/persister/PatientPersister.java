@@ -1,6 +1,11 @@
 package org.bahmni.module.admin.csv.persister;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.bahmni.common.config.registration.service.RegistrationPageReaderService;
+import org.bahmni.common.config.registration.service.RegistrationPageService;
+import org.bahmni.common.config.registration.service.impl.RegistrationPageReaderServiceImpl;
+import org.bahmni.common.config.registration.service.impl.RegistrationPageServiceImpl;
 import org.bahmni.csv.EntityPersister;
 import org.bahmni.csv.Messages;
 import org.bahmni.module.admin.csv.models.PatientRow;
@@ -36,7 +41,12 @@ public class PatientPersister implements EntityPersister<PatientRow> {
 
     private CSVAddressService csvAddressService;
 
-    private static final Logger log = Logger.getLogger(PatientPersister.class);
+    private static final Logger log = LogManager.getLogger(PatientPersister.class);
+
+    private RegistrationPageReaderService registrationPageReaderService = new RegistrationPageReaderServiceImpl();
+
+    private RegistrationPageService registrationPageService = new RegistrationPageServiceImpl(registrationPageReaderService);
+
 
     public void init(UserContext userContext) {
         this.userContext = userContext;
@@ -48,7 +58,7 @@ public class PatientPersister implements EntityPersister<PatientRow> {
             Context.openSession();
             Context.setUserContext(userContext);
 
-            new CSVPatientService(patientService, personService, conceptService, administrationService, getAddressHierarchyService()).save(patientRow);
+            new CSVPatientService(patientService, personService, conceptService, administrationService, getAddressHierarchyService(), registrationPageService).save(patientRow);
 
             return new Messages();
         } catch (Throwable e) {

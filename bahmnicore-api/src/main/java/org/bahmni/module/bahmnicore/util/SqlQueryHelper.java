@@ -1,6 +1,9 @@
 package org.bahmni.module.bahmnicore.util;
 
-import org.apache.log4j.Logger;
+import org.apache.commons.lang3.StringUtils;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bahmni.module.bahmnicore.model.searchParams.AdditionalSearchParam;
 import org.codehaus.jackson.map.ObjectMapper;
 
@@ -11,13 +14,14 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class SqlQueryHelper {
     private final Pattern paramPlaceHolderPattern;
     private static final String PARAM_PLACE_HOLDER_REGEX = "\\$\\{[^{]*\\}";
-    private static final Logger log = Logger.getLogger(SqlQueryHelper.class);
+    private static final Logger log = LogManager.getLogger(SqlQueryHelper.class);
 
     public SqlQueryHelper() {
         this.paramPlaceHolderPattern = Pattern.compile(PARAM_PLACE_HOLDER_REGEX);
@@ -52,7 +56,13 @@ public class SqlQueryHelper {
         if(params != null ){
             int i=1;
             for (String paramName : paramNamesFromPlaceHolders) {
-                String paramValue = params.get(paramName)[0];
+                String[] paramValues = params.get(paramName);
+                if (paramValues == null) {
+                    String error = String.format("Required Parameter [%s] is missing for the query", paramName);
+                    log.error(error);
+                    throw new RuntimeException(error);
+                }
+                String paramValue = paramValues[0];
                 preparedStatement.setObject(i++,paramValue);
             }
         }
@@ -72,5 +82,59 @@ public class SqlQueryHelper {
         return queryWithAdditionalParams;
     }
 
+    public static String escapeSQL(String str, boolean escapeDoubleQuotes, Character escapeChar) {
+        if (StringUtils.isBlank(str)) {
+            return str;
+        }
+        char escChar = '\\';
+        if (escapeChar != null) {
+            escChar = escapeChar.charValue();
+        }
+        String strToCheck = str.trim().replace("0x", "0X").replace("/*", "\\/*");
+        StringBuilder sBuilder = new StringBuilder();
+        int stringLength = strToCheck.length();
+        for (int i = 0; i < stringLength; ++i) {
+            char c = strToCheck.charAt(i);
+            switch (c) {
+                case 0:
+                    sBuilder.append(escChar);
+                    sBuilder.append('0');
+                    break;
+                case ';':
+                    sBuilder.append(escChar);
+                    sBuilder.append(';');
+                    break;
+                case '\n': /* Must be escaped for logs */
+                    sBuilder.append(escChar);
+                    sBuilder.append('n');
+                    break;
+                case '\r':
+                    sBuilder.append(escChar);
+                    sBuilder.append('r');
+                    break;
+                case '\\':
+                    sBuilder.append(escChar);
+                    sBuilder.append('\\');
+                    break;
+                case '\'':
+                    sBuilder.append(escChar);
+                    sBuilder.append('\'');
+                    break;
+                case '"':
+                    if (escapeDoubleQuotes) {
+                        sBuilder.append('\\');
+                    }
+                    sBuilder.append('"');
+                    break;
+                case '\032':
+                    sBuilder.append(escChar);
+                    sBuilder.append('Z');
+                    break;
+                default:
+                    sBuilder.append(c);
+            }
+        }
+        return sBuilder.toString();
+    }
 
 }

@@ -10,7 +10,6 @@ import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniObser
 import org.openmrs.module.bahmniemrapi.encountertransaction.mapper.parameters.AdditionalBahmniObservationFields;
 import org.openmrs.module.emrapi.encounter.domain.EncounterTransaction;
 import org.openmrs.obs.ComplexData;
-import org.openmrs.obs.ComplexObsHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -56,7 +55,7 @@ public class ETObsToBahmniObsMapper {
 
         BahmniObservation bahmniObservation= createBahmniObservation(observation,additionalBahmniObservationFields,rootConcepts);
 
-        if (CONCEPT_DETAILS_CONCEPT_CLASS.equals(observation.getConcept().getConceptClass()) && flatten) {
+        if (validateFormNameSpace(observation) && flatten) {
             handleFlattenedConceptDetails(observation,bahmniObservation);
         } else if (observation.getGroupMembers().size() > 0) {
             for (EncounterTransaction.Observation groupMember : observation.getGroupMembers()) {
@@ -84,13 +83,15 @@ public class ETObsToBahmniObsMapper {
         return bahmniObservation;
     }
 
+    private boolean validateFormNameSpace(EncounterTransaction.Observation observation) {
+        return observation.getFormNamespace() == null && CONCEPT_DETAILS_CONCEPT_CLASS.equals(observation.getConcept().getConceptClass());
+    }
+
     private Serializable getComplexObsValue(BahmniObservation bahmniObservation) {
         if (complexDataMappers.isEmpty()) {
             return null;
         }
-
-        Obs obs = getObsService().getComplexObs(
-                getObsService().getObsByUuid(bahmniObservation.getUuid()).getId(), ComplexObsHandler.RAW_VIEW);
+        Obs obs = getObsService().getObs(getObsService().getObsByUuid(bahmniObservation.getUuid()).getId());
         ComplexData complexData = obs.getComplexData();
 
         BahmniComplexDataMapper dataMapper = null;
@@ -194,6 +195,7 @@ public class ETObsToBahmniObsMapper {
         bahmniObservation.setEncounterUuid(additionalBahmniObservationFields.getEncounterUuid());
         bahmniObservation.setObsGroupUuid(additionalBahmniObservationFields.getObsGroupUuid());
         bahmniObservation.setUnknown(false);
+        bahmniObservation.setEncounterTypeName(additionalBahmniObservationFields.getEncounterTypeName());
         return bahmniObservation;
     }
 

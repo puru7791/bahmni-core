@@ -21,7 +21,9 @@ import org.openmrs.ConceptNumeric;
 import org.openmrs.ConceptSet;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.context.Context;
+import org.openmrs.api.context.UserContext;
 import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
@@ -33,10 +35,11 @@ import static org.bahmni.module.referencedata.labconcepts.advice.ConceptServiceE
 import static org.bahmni.module.referencedata.labconcepts.advice.ConceptServiceEventInterceptorTest.getConceptSets;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.when;
 
+@PowerMockIgnore("javax.management.*")
 @PrepareForTest(Context.class)
 @RunWith(PowerMockRunner.class)
 public class LabTestMapperTest {
@@ -49,6 +52,8 @@ public class LabTestMapperTest {
     private List<ConceptSet> sampleConceptSets;
     private List<ConceptSet> departmentConceptSets;
     private List<ConceptSet> testConceptSets;
+    @Mock
+    private UserContext userContext;
 
     @Before
     public void setUp() throws Exception {
@@ -60,11 +65,11 @@ public class LabTestMapperTest {
         Locale defaultLocale = new Locale("en", "GB");
         PowerMockito.mockStatic(Context.class);
         when(Context.getLocale()).thenReturn(defaultLocale);
-        testConcept = new ConceptBuilder().withUUID("Test UUID").withDateCreated(dateCreated).withClass(LabTest.LAB_TEST_CONCEPT_CLASS).withDescription("SomeDescription")
+        testConcept = new ConceptBuilder().withUUID("Test UUID").withDateCreated(dateCreated).withClass(LabTest.LAB_TEST_CONCEPT_CLASSES.get(0)).withDescription("SomeDescription")
                 .withDateChanged(dateChanged).withShortName("ShortName").withName("Test Name Here").withDataType(ConceptDatatype.NUMERIC).build();
         Concept testAndPanelsConcept = new ConceptBuilder().withUUID("Test and Panels UUID").withDateCreated(dateCreated).withClassUUID(ConceptClass.CONVSET_UUID)
                 .withDateChanged(dateChanged).withShortName("ShortName").withName(AllTestsAndPanels.ALL_TESTS_AND_PANELS).withSetMember(testConcept).build();
-        Concept sampleConcept = new ConceptBuilder().withUUID("Sample UUID").withDateCreated(dateCreated).withClass(Sample.SAMPLE_CONCEPT_CLASS).
+        Concept sampleConcept = new ConceptBuilder().withUUID("Sample UUID").withDateCreated(dateCreated).withClass(Sample.SAMPLE_CONCEPT_CLASSES.get(0)).
                 withDateChanged(dateChanged).withSetMember(testConcept).withShortName("ShortName").withName("SampleName").build();
         Concept laboratoryConcept = new ConceptBuilder().withUUID("Laboratory UUID")
                 .withName(AllSamples.ALL_SAMPLES).withClassUUID(ConceptClass.LABSET_UUID)
@@ -102,7 +107,7 @@ public class LabTestMapperTest {
                 return null;
             }
         });
-        when(conceptService.getConceptNumeric(anyInt())).thenReturn(conceptNumeric);
+        when(conceptService.getConceptNumeric(eq(null))).thenReturn(conceptNumeric);
         when(Context.getConceptService()).thenReturn(conceptService);
     }
 
@@ -119,7 +124,7 @@ public class LabTestMapperTest {
 
     @Test
     public void testUnitOfMeasureIsNullIfNotSpecified() throws Exception {
-        when(conceptService.getConceptNumeric(anyInt())).thenReturn(null);
+        when(conceptService.getConceptNumeric(eq(null))).thenReturn(null);
         LabTest testData = testMapper.map(testConcept);
         assertNull(testData.getTestUnitOfMeasure());
     }
